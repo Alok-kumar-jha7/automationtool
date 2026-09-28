@@ -545,8 +545,31 @@
         <!-- Connecting Spinner State -->
         <div id="qrLoadingState" class="py-8 space-y-3">
           <div class="w-10 h-10 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p class="text-xs text-gray-300 font-medium">Initializing WhatsApp Web session...</p>
-          <p class="text-[11px] text-gray-500">Generating secure QR code, please wait</p>
+          <p id="qrLoadingTitle" class="text-xs text-gray-200 font-medium">Initializing WhatsApp Web session...</p>
+          <p id="qrLoadingSub" class="text-[11px] text-gray-400">Loading browser & rendering QR (takes ~15-25s)...</p>
+          <div class="pt-2">
+            <button id="forceGenerateQrBtn" type="button" class="btn-ghost text-[11px] text-gray-400 hover:text-emerald-400 flex items-center gap-1 mx-auto cursor-pointer">
+              <i data-lucide="refresh-cw" class="w-3 h-3"></i>
+              <span>Force Reload QR Code</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Error / Timeout State -->
+        <div id="qrErrorState" class="hidden py-6 space-y-3">
+          <div class="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mx-auto">
+            <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <h4 class="text-sm font-bold text-white">QR Code Generation Delayed</h4>
+            <p id="qrErrorMessage" class="text-xs text-gray-400 mt-1 max-w-xs mx-auto">The cloud server is taking longer than usual to load WhatsApp Web.</p>
+          </div>
+          <div class="pt-2 flex items-center justify-center gap-2">
+            <button id="qrRetryBtn" type="button" class="btn-primary text-xs px-4 py-2 flex items-center gap-1.5 cursor-pointer">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+              <span>Restart & Generate QR</span>
+            </button>
+          </div>
         </div>
 
         <!-- QR Display State -->

@@ -155,6 +155,10 @@ const qrImageElement = $('qrImageElement');
 const refreshQrBtn = $('refreshQrBtn');
 const relinkWhatsAppBtn = $('relinkWhatsAppBtn');
 const qrDoneBtn = $('qrDoneBtn');
+const qrErrorState = $('qrErrorState');
+const qrErrorMessage = $('qrErrorMessage');
+const qrRetryBtn = $('qrRetryBtn');
+const forceGenerateQrBtn = $('forceGenerateQrBtn');
 
 // =============================================================================
 // TOAST SYSTEM
@@ -398,17 +402,29 @@ async function checkWhatsAppQrStatus() {
     if (auth.isReady) {
       if (qrLoadingState) qrLoadingState.classList.add('hidden');
       if (qrReadyState) qrReadyState.classList.add('hidden');
+      if (qrErrorState) qrErrorState.classList.add('hidden');
       if (qrSuccessState) qrSuccessState.classList.remove('hidden');
-      // Fetch groups as soon as WhatsApp is ready
       fetchWhatsAppGroups();
     } else if (auth.qrDataUrl) {
       if (qrLoadingState) qrLoadingState.classList.add('hidden');
       if (qrSuccessState) qrSuccessState.classList.add('hidden');
+      if (qrErrorState) qrErrorState.classList.add('hidden');
       if (qrReadyState) qrReadyState.classList.remove('hidden');
       if (qrImageElement) qrImageElement.src = auth.qrDataUrl;
+    } else if (auth.status === 'timeout' || auth.status === 'auth_failure') {
+      if (qrLoadingState) qrLoadingState.classList.add('hidden');
+      if (qrReadyState) qrReadyState.classList.add('hidden');
+      if (qrSuccessState) qrSuccessState.classList.add('hidden');
+      if (qrErrorState) {
+        qrErrorState.classList.remove('hidden');
+        if (qrErrorMessage && auth.authFailureReason) {
+          qrErrorMessage.textContent = auth.authFailureReason;
+        }
+      }
     } else {
       if (qrSuccessState) qrSuccessState.classList.add('hidden');
       if (qrReadyState) qrReadyState.classList.add('hidden');
+      if (qrErrorState) qrErrorState.classList.add('hidden');
       if (qrLoadingState) qrLoadingState.classList.remove('hidden');
     }
   } catch (err) {
@@ -1098,6 +1114,23 @@ if (relinkWhatsAppBtn) {
     }
   });
 }
+
+// Retry / Force Reload QR Code
+const handleQrRetry = async () => {
+  try {
+    showToast('Restarting WhatsApp Web browser...', 'info');
+    if (qrLoadingState) qrLoadingState.classList.remove('hidden');
+    if (qrErrorState) qrErrorState.classList.add('hidden');
+    if (qrReadyState) qrReadyState.classList.add('hidden');
+    await apiCall('/api/whatsapp/reconnect', { method: 'POST' });
+    setTimeout(checkWhatsAppQrStatus, 2000);
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+};
+
+if (qrRetryBtn) qrRetryBtn.addEventListener('click', handleQrRetry);
+if (forceGenerateQrBtn) forceGenerateQrBtn.addEventListener('click', handleQrRetry);
 
 // Close modals when clicking backdrop
 window.addEventListener('click', (e) => {
