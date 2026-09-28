@@ -159,6 +159,10 @@ const qrErrorState = $('qrErrorState');
 const qrErrorMessage = $('qrErrorMessage');
 const qrRetryBtn = $('qrRetryBtn');
 const forceGenerateQrBtn = $('forceGenerateQrBtn');
+const qrSyncState = $('qrSyncState');
+const qrSyncPercentBadge = $('qrSyncPercentBadge');
+const qrSyncProgressBar = $('qrSyncProgressBar');
+const qrSyncPercentText = $('qrSyncPercentText');
 
 // =============================================================================
 // TOAST SYSTEM
@@ -402,11 +406,23 @@ async function checkWhatsAppQrStatus() {
     if (auth.isReady) {
       if (qrLoadingState) qrLoadingState.classList.add('hidden');
       if (qrReadyState) qrReadyState.classList.add('hidden');
+      if (qrSyncState) qrSyncState.classList.add('hidden');
       if (qrErrorState) qrErrorState.classList.add('hidden');
       if (qrSuccessState) qrSuccessState.classList.remove('hidden');
       fetchWhatsAppGroups();
+    } else if (auth.status === 'loading') {
+      if (qrLoadingState) qrLoadingState.classList.add('hidden');
+      if (qrReadyState) qrReadyState.classList.add('hidden');
+      if (qrErrorState) qrErrorState.classList.add('hidden');
+      if (qrSuccessState) qrSuccessState.classList.add('hidden');
+      if (qrSyncState) qrSyncState.classList.remove('hidden');
+      const pct = Math.max(5, Math.min(100, Number(auth.loadingPercent) || 0));
+      if (qrSyncPercentBadge) qrSyncPercentBadge.textContent = `${pct}%`;
+      if (qrSyncProgressBar) qrSyncProgressBar.style.width = `${pct}%`;
+      if (qrSyncPercentText) qrSyncPercentText.textContent = `Syncing chats: ${pct}%`;
     } else if (auth.qrDataUrl) {
       if (qrLoadingState) qrLoadingState.classList.add('hidden');
+      if (qrSyncState) qrSyncState.classList.add('hidden');
       if (qrSuccessState) qrSuccessState.classList.add('hidden');
       if (qrErrorState) qrErrorState.classList.add('hidden');
       if (qrReadyState) qrReadyState.classList.remove('hidden');
@@ -414,6 +430,7 @@ async function checkWhatsAppQrStatus() {
     } else if (auth.status === 'timeout' || auth.status === 'auth_failure') {
       if (qrLoadingState) qrLoadingState.classList.add('hidden');
       if (qrReadyState) qrReadyState.classList.add('hidden');
+      if (qrSyncState) qrSyncState.classList.add('hidden');
       if (qrSuccessState) qrSuccessState.classList.add('hidden');
       if (qrErrorState) {
         qrErrorState.classList.remove('hidden');
@@ -424,6 +441,7 @@ async function checkWhatsAppQrStatus() {
     } else {
       if (qrSuccessState) qrSuccessState.classList.add('hidden');
       if (qrReadyState) qrReadyState.classList.add('hidden');
+      if (qrSyncState) qrSyncState.classList.add('hidden');
       if (qrErrorState) qrErrorState.classList.add('hidden');
       if (qrLoadingState) qrLoadingState.classList.remove('hidden');
     }
@@ -1107,6 +1125,7 @@ if (relinkWhatsAppBtn) {
       availableWhatsAppGroups = [];
       populateGroupSelects([]);
       if (qrSuccessState) qrSuccessState.classList.add('hidden');
+      if (qrSyncState) qrSyncState.classList.add('hidden');
       if (qrLoadingState) qrLoadingState.classList.remove('hidden');
       setTimeout(checkWhatsAppQrStatus, 1500);
     } catch (err) {
@@ -1120,6 +1139,7 @@ const handleQrRetry = async () => {
   try {
     showToast('Restarting WhatsApp Web browser...', 'info');
     if (qrLoadingState) qrLoadingState.classList.remove('hidden');
+    if (qrSyncState) qrSyncState.classList.add('hidden');
     if (qrErrorState) qrErrorState.classList.add('hidden');
     if (qrReadyState) qrReadyState.classList.add('hidden');
     await apiCall('/api/whatsapp/reconnect', { method: 'POST' });

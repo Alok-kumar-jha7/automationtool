@@ -109,17 +109,20 @@ export function initWhatsAppClient(userId = 'default', options = {}) {
 
       const client = new Client({
         authStrategy: new LocalAuth(authStrategyConfig),
-        webVersionCache: { type: 'none' },
+        webVersionCache: {
+          type: 'remote',
+          remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/{version}.html',
+        },
         puppeteer: {
-          headless,
+          headless: true,
           ...(process.env.PUPPETEER_EXECUTABLE_PATH ? { executablePath: process.env.PUPPETEER_EXECUTABLE_PATH } : {}),
           args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
+            '--disable-blink-features=AutomationControlled',
             '--disable-accelerated-2d-canvas',
             '--no-first-run',
-            '--no-zygote',
             '--disable-gpu',
             '--disable-extensions',
             '--disable-default-apps',
@@ -129,7 +132,7 @@ export function initWhatsAppClient(userId = 'default', options = {}) {
             '--disable-breakpad',
             '--disable-sync',
             '--disable-translate',
-            '--js-flags=--max-old-space-size=256',
+            '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
           ],
         },
       });
@@ -144,6 +147,14 @@ export function initWhatsAppClient(userId = 'default', options = {}) {
           session.authFailureReason = 'Browser is taking longer than expected. Click "Retry / Force Refresh" to restart.';
         }
       }, 45000);
+
+      // Event: Loading screen / chat syncing after scan
+      client.on('loading_screen', (percent, message) => {
+        clearTimeout(initWatchdog);
+        session.authStatus = 'loading';
+        session.loadingPercent = percent;
+        console.log(`[WhatsApp] [User: ${cleanId}] 🔄 Syncing WhatsApp: ${percent}% - ${message}`);
+      });
 
       // Event: Display QR Code for terminal and web dashboard scanning
       client.on('qr', async (qr) => {
@@ -278,6 +289,7 @@ export function getWhatsAppAuthStatus(userId = 'default') {
     userId: cleanId,
     isReady: Boolean(session.clientInstance && session.isClientReady),
     status: session.isClientReady ? 'ready' : session.authStatus,
+    loadingPercent: session.loadingPercent || 0,
     qrCode: session.latestQrString,
     qrDataUrl: session.latestQrDataUrl,
     qrGeneratedAt: session.qrGeneratedAt,

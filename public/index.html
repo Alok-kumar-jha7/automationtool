@@ -603,6 +603,23 @@
           </div>
         </div>
 
+        <!-- Syncing State (When phone scans and WhatsApp Web syncs chats) -->
+        <div id="qrSyncState" class="hidden py-8 space-y-4">
+          <div class="relative w-16 h-16 mx-auto">
+            <div class="w-16 h-16 border-4 border-emerald-500/20 rounded-full"></div>
+            <div class="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin absolute inset-0"></div>
+            <div class="absolute inset-0 flex items-center justify-center font-mono font-bold text-xs text-emerald-400" id="qrSyncPercentBadge">0%</div>
+          </div>
+          <div>
+            <h4 class="text-sm font-bold text-white">QR Code Scanned! Connecting...</h4>
+            <p class="text-xs text-gray-400 mt-1 max-w-xs mx-auto">WhatsApp is encrypting keys and syncing your recent chats. This takes 5-15 seconds.</p>
+          </div>
+          <div class="w-full bg-white/[0.06] rounded-full h-2 overflow-hidden max-w-xs mx-auto">
+            <div id="qrSyncProgressBar" class="bg-gradient-to-r from-emerald-500 to-teal-400 h-full transition-all duration-300" style="width: 15%"></div>
+          </div>
+          <p id="qrSyncPercentText" class="text-[11px] font-mono text-emerald-400">Syncing chats: 15%</p>
+        </div>
+
         <!-- Authenticated State -->
         <div id="qrSuccessState" class="hidden py-6 space-y-3">
           <div class="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/10">
