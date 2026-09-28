@@ -2,7 +2,7 @@
 <html lang="en" class="h-full">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
   <title>AutoReport AI — Smart Daily Work Automation</title>
   <meta name="description" content="AI-powered daily work report automation with WhatsApp & Telegram delivery" />
   <meta name="theme-color" content="#030712" />
@@ -54,38 +54,38 @@
 
   <!-- ===================== HEADER ===================== -->
   <header class="sticky top-0 z-50 w-full backdrop-blur-xl bg-gray-950/70 border-b border-white/[0.06]">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <div class="relative group">
+    <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-2 sm:gap-3">
+        <div class="relative group shrink-0">
           <div class="absolute -inset-1 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-2xl opacity-30 blur group-hover:opacity-50 transition"></div>
-          <div class="relative h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-400 flex items-center justify-center shadow-lg">
-            <i data-lucide="zap" class="w-5 h-5 text-gray-950"></i>
+          <div class="relative h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-400 flex items-center justify-center shadow-lg">
+            <i data-lucide="zap" class="w-4 h-4 sm:w-5 sm:h-5 text-gray-950"></i>
           </div>
         </div>
-        <div>
-          <div class="flex items-center gap-2">
-            <h1 class="font-extrabold text-base sm:text-lg tracking-tight bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">AutoReport AI</h1>
-            <span class="hidden sm:inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono font-semibold">v3.0</span>
+        <div class="min-w-0">
+          <div class="flex items-center gap-1.5 sm:gap-2">
+            <h1 class="font-extrabold text-sm sm:text-lg tracking-tight bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent truncate">AutoReport AI</h1>
+            <span class="hidden md:inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono font-semibold">v3.0</span>
           </div>
-          <div class="flex items-center gap-1.5 text-[11px]">
-            <span id="headerLiveDot" class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span id="headerStatusText" class="font-medium text-gray-400">Initializing...</span>
+          <div class="flex items-center gap-1.5 text-[10px] sm:text-[11px]">
+            <span id="headerLiveDot" class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+            <span id="headerStatusText" class="font-medium text-gray-400 truncate">Initializing...</span>
           </div>
         </div>
       </div>
 
-      <div class="flex items-center gap-2 sm:gap-3">
+      <div class="flex items-center gap-1.5 sm:gap-3">
         <!-- Workspace Switcher Dropdown -->
-        <div class="relative" id="workspaceDropdownWrapper">
-          <button id="workspaceBtn" type="button" class="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border border-white/10 text-xs font-semibold bg-white/[0.04] hover:bg-white/[0.08] transition cursor-pointer">
-            <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+        <div class="relative shrink-0" id="workspaceDropdownWrapper">
+          <button id="workspaceBtn" type="button" class="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-xl border border-white/10 text-xs font-semibold bg-white/[0.04] hover:bg-white/[0.08] transition cursor-pointer">
+            <span class="w-2 h-2 rounded-full bg-cyan-400 shrink-0"></span>
             <span class="text-gray-400 hidden md:inline text-[11px]">Workspace:</span>
-            <span id="currentWorkspaceName" class="truncate max-w-[80px] sm:max-w-[120px] text-white">Default</span>
-            <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-gray-400"></i>
+            <span id="currentWorkspaceName" class="truncate max-w-[55px] sm:max-w-[120px] text-white">Default</span>
+            <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-gray-400 shrink-0"></i>
           </button>
 
           <!-- Dropdown Menu -->
-          <div id="workspaceMenu" class="hidden absolute right-0 mt-2 w-64 rounded-2xl bg-gray-900/95 border border-white/10 shadow-2xl backdrop-blur-xl p-2 z-50 space-y-1">
+          <div id="workspaceMenu" class="hidden absolute right-0 mt-2 w-64 max-w-[calc(100vw-1.5rem)] rounded-2xl bg-gray-900/95 border border-white/10 shadow-2xl backdrop-blur-xl p-2 z-50 space-y-1">
             <div class="px-2 py-1.5 text-[10px] font-mono uppercase tracking-wider text-gray-400 flex items-center justify-between border-b border-white/5 pb-1.5">
               <span>Workspaces</span>
               <button id="copyWorkspaceLinkBtn" type="button" class="text-emerald-400 hover:text-emerald-300 flex items-center gap-1 font-sans text-[11px] normal-case" title="Copy link for this workspace to share">
@@ -105,17 +105,17 @@
         </div>
 
         <!-- WhatsApp Connect Button -->
-        <button id="headerWhatsAppBtn" type="button" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/10 text-xs font-semibold bg-white/[0.04] hover:bg-white/[0.08] transition cursor-pointer">
-          <span id="headerWhatsAppDot" class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+        <button id="headerWhatsAppBtn" type="button" class="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border border-white/10 text-xs font-semibold bg-white/[0.04] hover:bg-white/[0.08] transition cursor-pointer shrink-0">
+          <span id="headerWhatsAppDot" class="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0"></span>
           <span id="headerWhatsAppText">WhatsApp Login</span>
         </button>
         <!-- Uptime Badge -->
-        <div class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/[0.06] text-[11px] font-mono text-gray-400">
+        <div class="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/[0.06] text-[11px] font-mono text-gray-400 shrink-0">
           <i data-lucide="timer" class="w-3 h-3"></i>
           <span id="uptimeDisplay">0m</span>
         </div>
         <!-- Master Toggle -->
-        <button id="masterToggleBtn" class="toggle-active flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all duration-300 active:scale-[0.97]">
+        <button id="masterToggleBtn" class="toggle-active flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-bold transition-all duration-300 active:scale-[0.97] shrink-0">
           <span id="masterToggleIcon" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-sm shadow-emerald-500/50"></span>
           <span id="masterToggleLabel">ACTIVE</span>
         </button>
@@ -214,7 +214,7 @@
         </div>
 
         <!-- Configuration Grid -->
-        <div class="grid grid-cols-2 gap-3 mb-5">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
           <div>
             <label class="input-label">Channel</label>
             <select id="channelSelect" class="select-primary">
@@ -302,7 +302,7 @@
         </div>
 
         <!-- Action Buttons -->
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
           <button id="saveScheduleBtn" type="button" class="btn-secondary">
             <i data-lucide="calendar-check" class="w-4 h-4 text-emerald-400"></i>
             <span>Save Schedule</span>
@@ -425,7 +425,7 @@
         </div>
 
         <!-- Time & Frequency / Date Grid -->
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label class="input-label">Dispatch Time</label>
             <input id="modalTimeInput" type="time" value="21:00" class="input-primary font-mono text-sm py-2" />
@@ -451,17 +451,17 @@
             <span class="text-[10px] text-emerald-400 font-mono" id="modalActiveTargetDesc">Direct Phone</span>
           </div>
           <div class="grid grid-cols-2 gap-2 mb-2">
-            <button id="modalTargetContactBtn" type="button" class="px-3 py-1.5 rounded-xl text-xs font-semibold border transition text-center bg-emerald-500/15 border-emerald-500/40 text-emerald-300">
+            <button id="modalTargetContactBtn" type="button" class="px-3 py-2 rounded-xl text-xs font-semibold border transition text-center bg-emerald-500/15 border-emerald-500/40 text-emerald-300">
               👤 Direct Phone
             </button>
-            <button id="modalTargetGroupBtn" type="button" class="px-3 py-1.5 rounded-xl text-xs font-semibold border transition text-center bg-white/[0.03] border-white/[0.08] text-gray-400 hover:text-white">
+            <button id="modalTargetGroupBtn" type="button" class="px-3 py-2 rounded-xl text-xs font-semibold border transition text-center bg-white/[0.03] border-white/[0.08] text-gray-400 hover:text-white">
               👥 WhatsApp Group
             </button>
           </div>
         </div>
 
         <!-- Channel & Recipient Grid -->
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label class="input-label">Dispatch Channel</label>
             <select id="modalChannelSelect" class="select-primary text-xs py-2">
@@ -508,11 +508,11 @@
       </div>
 
       <!-- Modal Footer -->
-      <div class="mt-5 pt-3 border-t border-white/[0.06] flex items-center justify-end gap-2.5">
+      <div class="modal-footer mt-5 pt-3 border-t border-white/[0.06] flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2.5">
         <button id="cancelScheduleModalBtn" type="button" class="btn-ghost text-xs px-3 py-2">
           Cancel
         </button>
-        <button id="confirmScheduleModalBtn" type="button" class="btn-primary-glow text-xs px-4 py-2 flex items-center gap-1.5">
+        <button id="confirmScheduleModalBtn" type="button" class="btn-primary-glow text-xs px-4 py-2 flex items-center justify-center gap-1.5">
           <i data-lucide="check-circle" class="w-4 h-4"></i>
           <span>Confirm & Schedule</span>
         </button>
@@ -576,9 +576,9 @@
         <div id="qrReadyState" class="hidden space-y-3">
           <div class="qr-box-container">
             <div class="qr-image-wrapper">
-              <img id="qrImageElement" src="" alt="WhatsApp QR Code" class="w-56 h-56 object-contain block" />
+              <img id="qrImageElement" src="" alt="WhatsApp QR Code" class="max-w-[200px] sm:max-w-[224px] w-full h-auto aspect-square object-contain block mx-auto" />
             </div>
-            <p class="text-[11px] text-gray-400 mt-2 font-mono flex items-center gap-1.5">
+            <p class="text-[11px] text-gray-400 mt-2 font-mono flex items-center justify-center gap-1.5">
               <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
               Waiting for scan from your phone...
             </p>
@@ -629,7 +629,7 @@
             <h4 class="text-sm font-bold text-white">WhatsApp Connected & Logged In!</h4>
             <p class="text-xs text-gray-400 mt-1 max-w-xs mx-auto">Your WhatsApp Web session is authenticated. You can now schedule and send automated daily reports.</p>
           </div>
-          <div class="pt-2 flex items-center justify-center gap-2">
+          <div class="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2">
             <button id="qrDoneBtn" type="button" class="btn-primary text-xs px-5 py-2">
               Done / Continue
             </button>
@@ -669,11 +669,11 @@
         </div>
       </div>
 
-      <div class="mt-5 pt-3 border-t border-white/[0.06] flex items-center justify-end gap-2.5">
+      <div class="modal-footer mt-5 pt-3 border-t border-white/[0.06] flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2">
         <button id="cancelNewWorkspaceBtn" type="button" class="btn-ghost text-xs px-3 py-2">
           Cancel
         </button>
-        <button id="submitNewWorkspaceBtn" type="button" class="btn-primary-glow text-xs px-4 py-2 flex items-center gap-1.5">
+        <button id="submitNewWorkspaceBtn" type="button" class="btn-primary-glow text-xs px-4 py-2 flex items-center justify-center gap-1.5">
           <i data-lucide="check" class="w-4 h-4"></i>
           <span>Create & Switch</span>
         </button>
@@ -682,7 +682,7 @@
   </div>
 
   <!-- Toast Container -->
-  <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
+  <div id="toastContainer" class="fixed bottom-5 left-1/2 -translate-x-1/2 sm:left-auto sm:right-5 sm:translate-x-0 z-50 flex flex-col gap-2 max-w-[calc(100vw-2rem)] sm:max-w-sm w-full pointer-events-none"></div>
 
   <script src="app.js"></script>
   <script>lucide.createIcons();</script>

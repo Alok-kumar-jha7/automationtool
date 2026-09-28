@@ -389,3 +389,127 @@ tbody tr:hover { background: rgba(255,255,255,0.02); }
   display: inline-block;
 }
 
+/* ============================================================================
+   MOBILE RESPONSIVENESS & TOUCH ERGONOMICS (Phones & Tablets)
+   ============================================================================ */
+html, body {
+  overflow-x: hidden;
+  width: 100%;
+  min-height: 100%;
+  -webkit-text-size-adjust: 100%;
+  touch-action: manipulation;
+}
+
+body {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@media (max-width: 640px) {
+  /* Prevent iOS Safari from auto-zooming on form focus */
+  .input-primary,
+  .select-primary,
+  textarea.textarea-primary,
+  textarea.textarea-output,
+  input[type="time"],
+  input[type="date"],
+  input[type="text"] {
+    font-size: 16px !important;
+    min-height: 42px;
+  }
+
+  /* Compact panels and cards on mobile */
+  .panel {
+    padding: 1rem;
+    border-radius: 1rem;
+  }
+
+  .stat-card {
+    padding: 0.75rem;
+    border-radius: 0.875rem;
+  }
+
+  .stat-value {
+    font-size: 1.125rem;
+  }
+
+  /* Modal bottom-sheet behavior on small screens */
+  .modal-backdrop {
+    padding: 0.5rem;
+    align-items: flex-end;
+  }
+
+  .modal-card {
+    max-height: 90dvh;
+    border-radius: 1.25rem 1.25rem 1rem 1rem;
+    padding: 1.15rem;
+    transform: translateY(24px);
+  }
+
+  .modal-backdrop.active .modal-card {
+    transform: translateY(0);
+  }
+
+  .modal-footer {
+    flex-direction: column-reverse;
+    gap: 0.5rem;
+  }
+
+  .modal-footer button {
+    width: 100%;
+    justify-content: center;
+    min-height: 44px;
+  }
+
+  /* Mobile buttons: easy thumb tap area */
+  .btn-primary-glow,
+  .btn-secondary,
+  .btn-send {
+    min-height: 44px;
+    font-size: 0.85rem;
+  }
+
+  /* QR code scaling on mobile screens */
+  .qr-box-container {
+    padding: 0.75rem;
+  }
+
+  .qr-image-wrapper {
+    padding: 0.5rem;
+  }
+
+  .qr-image-wrapper img {
+    max-width: 200px;
+    max-height: 200px;
+    width: 100%;
+    height: auto;
+  }
+
+  /* Smooth momentum scrolling for table */
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+}
+
+@media (max-width: 440px) {
+  #headerWhatsAppText {
+    max-width: 60px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #currentWorkspaceName {
+    max-width: 50px;
+  }
+
+  .modal-header h3 {
+    font-size: 0.85rem;
+  }
+
+  .template-chip {
+    font-size: 0.62rem;
+    padding: 0.25rem 0.5rem;
+  }
+}
+
