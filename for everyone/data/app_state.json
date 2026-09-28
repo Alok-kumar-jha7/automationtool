@@ -1,0 +1,23 @@
+{
+  "isEnabled": true,
+  "scheduleTime": "21:00",
+  "cronDays": "*",
+  "cronExpression": "0 21 * * *",
+  "recipient": "918987133942",
+  "dispatchChannel": "whatsapp",
+  "rawText": "Date: 2026-09-28\n\n### MANUAL NOTES & TASK LOG:\n- [09:30] Team standup and sprint backlog review.\n- [10:15] Refactored user authentication middleware to support JWT refresh token rotation.\n- [12:00] Reviewed PR #142 for the payment gateway webhook retry logic; left comments on error boundary handling.\n- [14:00] Optimized database query in PostgreSQL for active subscription queries; lowered p99 latency from 420ms to 65ms using composite indexes.\n- [16:30] Investigated intermittent timeout on Stripe webhook processing in production staging environment.\n- [17:15] Blockers: Waiting on DevOps approval for new Redis caching cluster deployment to production.\n- [17:45] Drafted technical documentation for the upcoming API v2 migration.",
+  "enhancedDraft": "📋 *Daily Progress Report — Mon, Sep 28*\n\n🚀 *Key Accomplishments:*\n• Refactored user authentication middleware to support JWT refresh token rotation.\n• Drafted technical documentation for the upcoming API v2 migration.\n\n📊 *Progress & Metrics:*\n• Team standup and sprint backlog review.\n• Reviewed PR #142 for the payment gateway webhook retry logic; left comments on error boundary handling.\n• Optimized database query in PostgreSQL for active subscription queries; lowered p99 latency from 420ms to 65ms using composite indexes.\n\n⚠️ *Blockers & Dependencies:*\n• Blockers: Waiting on DevOps approval for new Redis caching cluster deployment to production.\n\n\n\nthis is for testing",
+  "lastSentAt": null,
+  "lastStatus": "failed",
+  "history": [
+    {
+      "id": "1790609866885",
+      "timestamp": "2026-09-28T15:37:46.885Z",
+      "channel": "whatsapp",
+      "recipient": "918987133942",
+      "status": "failed",
+      "preview": "📋 *Daily Progress Report — Mon, Sep 28*\n\n🚀 *Key Accomplishments:*\n• Refactored user authentication middleware to support JWT refresh token...",
+      "error": "Cannot read properties of undefined (reading 'id')"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: autoreport-ai
+    env: docker
+    plan: free
+    dockerfilePath: Dockerfile
+    healthCheckPath: /api/status
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
+      - key: DEFAULT_DISPATCH_CHANNEL
+        value: telegram
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
+      - key: ENABLE_WHATSAPP
+        value: false

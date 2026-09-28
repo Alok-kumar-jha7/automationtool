@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# Environment credentials
+.env
+
+# WhatsApp Web Session Storage (contains sensitive session keys)
+.wwebjs_auth/
+.wwebjs_cache/
+
+# Operating System files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*

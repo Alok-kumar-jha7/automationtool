@@ -1,0 +1,51 @@
+{
+  "isEnabled": true,
+  "scheduleTime": "22:32",
+  "cronDays": "*",
+  "scheduleDate": null,
+  "cronExpression": "32 22 * * *",
+  "recipient": "918987133942",
+  "dispatchChannel": "whatsapp",
+  "rawText": "Alok testing this",
+  "enhancedDraft": "Alok testing this",
+  "lastSentAt": "2026-09-28T17:02:00.459Z",
+  "lastStatus": "success",
+  "history": [
+    {
+      "id": "1790614920459",
+      "timestamp": "2026-09-28T17:02:00.459Z",
+      "channel": "whatsapp",
+      "recipient": "918987133942",
+      "status": "success",
+      "preview": "Alok testing this...",
+      "error": null,
+      "triggerType": "scheduled",
+      "scheduledTime": "22:32",
+      "triggerAt": "2026-09-28T17:02:00.329Z"
+    },
+    {
+      "id": "1790614801084",
+      "timestamp": "2026-09-28T17:00:01.084Z",
+      "channel": "whatsapp",
+      "recipient": "918987133942",
+      "status": "success",
+      "preview": "📋 *Daily Progress Report — Mon, Sep 28*\n\n🚀 *Key Accomplishments:*\n• Refactored user authentication middleware to support JWT refresh token...",
+      "error": null,
+      "triggerType": "scheduled",
+      "scheduledTime": "22:30",
+      "triggerAt": "2026-09-28T17:00:00.542Z"
+    },
+    {
+      "id": "1790614201056",
+      "timestamp": "2026-09-28T16:50:01.056Z",
+      "channel": "whatsapp",
+      "recipient": "918987133942",
+      "status": "success",
+      "preview": "📋 *Daily Progress Report — Mon, Sep 28*\n\n🚀 *Key Accomplishments:*\n• Refactored user authentication middleware to support JWT refresh token...",
+      "error": null,
+      "triggerType": "scheduled",
+      "scheduledTime": "22:20",
+      "triggerAt": "2026-09-28T16:50:00.565Z"
+    }
+  ]
+}

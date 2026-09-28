@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+  <title>AutoReport AI — Smart Daily Work Automation</title>
+  <meta name="description" content="AI-powered daily work report automation with WhatsApp & Telegram delivery" />
+  <meta name="theme-color" content="#030712" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='80'>⚡</text></svg>" />
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          animation: {
+            'float': 'float 6s ease-in-out infinite',
+            'glow-pulse': 'glow-pulse 2s ease-in-out infinite alternate',
+            'slide-up': 'slide-up 0.5s cubic-bezier(0.16,1,0.3,1)',
+            'fade-in': 'fade-in 0.4s ease-out',
+            'shimmer': 'shimmer 2s linear infinite',
+          },
+          keyframes: {
+            float: { '0%,100%': { transform: 'translateY(0px)' }, '50%': { transform: 'translateY(-10px)' } },
+            'glow-pulse': { '0%': { boxShadow: '0 0 20px rgba(52,211,153,0.1)' }, '100%': { boxShadow: '0 0 40px rgba(52,211,153,0.2)' } },
+            'slide-up': { '0%': { opacity: 0, transform: 'translateY(20px)' }, '100%': { opacity: 1, transform: 'translateY(0)' } },
+            'fade-in': { '0%': { opacity: 0 }, '100%': { opacity: 1 } },
+            'shimmer': { '0%': { backgroundPosition: '-200% 0' }, '100%': { backgroundPosition: '200% 0' } },
+          },
+        }
+      }
+    }
+  </script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="min-h-full flex flex-col font-sans antialiased bg-gray-950 text-gray-100 selection:bg-emerald-500/20 selection:text-emerald-200">
+
+  <!-- Ambient Background Glow -->
+  <div class="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+    <div class="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] rounded-full bg-emerald-600/[0.04] blur-[120px] animate-float"></div>
+    <div class="absolute bottom-[-10%] right-[-10%] w-[600px] h-[600px] rounded-full bg-teal-500/[0.03] blur-[140px] animate-float" style="animation-delay: -3s"></div>
+    <div class="absolute top-[40%] left-[60%] w-[300px] h-[300px] rounded-full bg-cyan-500/[0.02] blur-[100px] animate-float" style="animation-delay: -1.5s"></div>
+  </div>
+
+  <!-- ===================== HEADER ===================== -->
+  <header class="sticky top-0 z-50 w-full backdrop-blur-xl bg-gray-950/70 border-b border-white/[0.06]">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="relative group">
+          <div class="absolute -inset-1 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-2xl opacity-30 blur group-hover:opacity-50 transition"></div>
+          <div class="relative h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-400 flex items-center justify-center shadow-lg">
+            <i data-lucide="zap" class="w-5 h-5 text-gray-950"></i>
+          </div>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="font-extrabold text-base sm:text-lg tracking-tight bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">AutoReport AI</h1>
+            <span class="hidden sm:inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono font-semibold">v3.0</span>
+          </div>
+          <div class="flex items-center gap-1.5 text-[11px]">
+            <span id="headerLiveDot" class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span id="headerStatusText" class="font-medium text-gray-400">Initializing...</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 sm:gap-3">
+        <!-- Uptime Badge -->
+        <div class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/[0.06] text-[11px] font-mono text-gray-400">
+          <i data-lucide="timer" class="w-3 h-3"></i>
+          <span id="uptimeDisplay">0m</span>
+        </div>
+        <!-- Master Toggle -->
+        <button id="masterToggleBtn" class="toggle-active flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all duration-300 active:scale-[0.97]">
+          <span id="masterToggleIcon" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-sm shadow-emerald-500/50"></span>
+          <span id="masterToggleLabel">ACTIVE</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===================== MAIN ===================== -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 space-y-5 sm:space-y-6">
+
+    <!-- ============ STATUS CARDS ============ -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 animate-slide-up">
+      
+      <!-- Schedule -->
+      <div class="stat-card group">
+        <div class="flex items-center justify-between mb-3">
+          <span class="stat-label">Next Dispatch</span>
+          <div class="stat-icon-wrap bg-emerald-500/10 text-emerald-400"><i data-lucide="clock" class="w-3.5 h-3.5"></i></div>
+        </div>
+        <span id="statSchedule" class="stat-value">21:00</span>
+        <span id="statDays" class="stat-sub">Every Day</span>
+      </div>
+
+      <!-- Recipient -->
+      <div class="stat-card group">
+        <div class="flex items-center justify-between mb-3">
+          <span class="stat-label">Recipient</span>
+          <div class="stat-icon-wrap bg-sky-500/10 text-sky-400"><i data-lucide="user" class="w-3.5 h-3.5"></i></div>
+        </div>
+        <span id="statRecipient" class="stat-value text-sm truncate block">Not Set</span>
+        <span id="statChannel" class="stat-sub uppercase tracking-widest">WhatsApp</span>
+      </div>
+
+      <!-- Status -->
+      <div class="stat-card group">
+        <div class="flex items-center justify-between mb-3">
+          <span class="stat-label">Engine Status</span>
+          <div class="stat-icon-wrap bg-violet-500/10 text-violet-400"><i data-lucide="activity" class="w-3.5 h-3.5"></i></div>
+        </div>
+        <span id="statMasterState" class="status-badge-active">RUNNING</span>
+        <span class="stat-sub mt-1">Cron scheduler active</span>
+      </div>
+
+      <!-- Last Dispatch -->
+      <div class="stat-card group">
+        <div class="flex items-center justify-between mb-3">
+          <span class="stat-label">Last Dispatch</span>
+          <div class="stat-icon-wrap bg-amber-500/10 text-amber-400"><i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i></div>
+        </div>
+        <span id="statLastSent" class="stat-value text-sm">Never</span>
+        <span id="statLastStatus" class="stat-sub">Idle</span>
+      </div>
+
+    </div>
+
+    <!-- ============ TWO-COLUMN WORKSPACE ============ -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
+
+      <!-- ========== LEFT: INPUT PANEL ========== -->
+      <section class="panel animate-slide-up" style="animation-delay: 0.1s">
+        
+        <!-- Panel Header -->
+        <div class="flex items-center justify-between mb-5">
+          <div class="flex items-center gap-2.5">
+            <div class="step-badge">1</div>
+            <div>
+              <h2 class="font-bold text-sm sm:text-[15px] text-white">Work Log Input</h2>
+              <p class="text-[11px] text-gray-500 mt-0.5">Type raw notes or load from file</p>
+            </div>
+          </div>
+          <button id="loadWorkLogBtn" type="button" class="btn-ghost text-[11px] sm:text-xs">
+            <i data-lucide="file-down" class="w-3.5 h-3.5"></i>
+            <span>Load File / Git</span>
+          </button>
+        </div>
+
+        <!-- Raw Text Input -->
+        <div class="space-y-2 mb-5">
+          <div class="flex items-center justify-between">
+            <label for="rawTextInput" class="input-label">Raw notes, commits, or bullet points:</label>
+            <span id="charCount" class="font-mono text-[10px] text-gray-500 bg-gray-900 px-1.5 py-0.5 rounded">0</span>
+          </div>
+          <textarea id="rawTextInput" rows="7" placeholder="- fixed database query latency&#10;- reviewed PR #142 for stripe webhook&#10;- call with design team for v2 release&#10;- blocker: waiting for devops approval"
+            class="textarea-primary"></textarea>
+        </div>
+
+        <!-- Quick Templates -->
+        <div class="mb-5">
+          <label class="input-label mb-2 block">Quick Templates:</label>
+          <div class="flex flex-wrap gap-1.5">
+            <button class="template-chip" data-template="- Completed: &#10;- In Progress: &#10;- Blockers: &#10;- Next Steps: ">📋 Standard</button>
+            <button class="template-chip" data-template="- Bug fixed: &#10;- Feature shipped: &#10;- Code reviewed: &#10;- Tests written: ">🐛 Dev Sprint</button>
+            <button class="template-chip" data-template="- Meeting with: &#10;- Decisions made: &#10;- Action items: &#10;- Follow-ups: ">📅 Meeting Notes</button>
+            <button class="template-chip" data-template="- Deployed: &#10;- Monitored: &#10;- Incidents: &#10;- Performance: ">🚀 DevOps</button>
+          </div>
+        </div>
+
+        <!-- Configuration Grid -->
+        <div class="grid grid-cols-2 gap-3 mb-5">
+          <div>
+            <label class="input-label">Channel</label>
+            <select id="channelSelect" class="select-primary">
+              <option value="whatsapp">📱 WhatsApp</option>
+              <option value="telegram">✈️ Telegram</option>
+              <option value="console">🖥️ Console (Test)</option>
+            </select>
+          </div>
+          <div>
+            <label class="input-label">Recipient</label>
+            <input id="recipientInput" type="text" placeholder="91XXXXXXXXXX" class="input-primary font-mono" />
+          </div>
+          <div>
+            <label class="input-label">Dispatch Time</label>
+            <input id="timeInput" type="time" value="21:00" class="input-primary font-mono" />
+          </div>
+          <div>
+            <label class="input-label">Frequency</label>
+            <select id="frequencySelect" class="select-primary">
+              <option value="1-5">Mon - Fri</option>
+              <option value="*">Every Day</option>
+              <option value="1,3,5">Mon, Wed, Fri</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- AI Enhance CTA -->
+        <button id="enhanceBtn" type="button" class="btn-primary-glow w-full">
+          <i data-lucide="wand-2" class="w-4 h-4"></i>
+          <span id="enhanceBtnText">Enhance with AI</span>
+        </button>
+
+      </section>
+
+      <!-- ========== RIGHT: OUTPUT PANEL ========== -->
+      <section class="panel animate-slide-up" style="animation-delay: 0.2s">
+        
+        <!-- Panel Header -->
+        <div class="flex items-center justify-between mb-5">
+          <div class="flex items-center gap-2.5">
+            <div class="step-badge step-badge-teal">2</div>
+            <div>
+              <h2 class="font-bold text-sm sm:text-[15px] text-white">AI Enhanced Report</h2>
+              <p class="text-[11px] text-gray-500 mt-0.5">Review, edit, then schedule or send</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <span id="wordCountBadge" class="word-badge">0 / 200</span>
+            <button id="copyPreviewBtn" type="button" class="btn-icon" title="Copy to clipboard">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Enhanced Output -->
+        <div class="flex-1 flex flex-col space-y-2 mb-5">
+          <label class="input-label">Live output (editable before dispatch):</label>
+          <div class="relative flex-1 min-h-[260px]">
+            <textarea id="enhancedOutput" rows="11" placeholder="Click 'Enhance with AI' to transform your raw notes into an executive report..."
+              class="textarea-output"></textarea>
+            <!-- Empty State Overlay -->
+            <div id="emptyStateOverlay" class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none opacity-60">
+              <i data-lucide="sparkles" class="w-8 h-8 text-gray-700 mb-3"></i>
+              <p class="text-xs text-gray-600 text-center px-8">Your AI-enhanced executive report will appear here</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="grid grid-cols-2 gap-3">
+          <button id="saveScheduleBtn" type="button" class="btn-secondary">
+            <i data-lucide="calendar-check" class="w-4 h-4 text-emerald-400"></i>
+            <span>Save Schedule</span>
+          </button>
+          <button id="sendNowBtn" type="button" class="btn-send">
+            <i data-lucide="send" class="w-4 h-4"></i>
+            <span id="sendNowBtnText">Send Now</span>
+          </button>
+        </div>
+
+      </section>
+
+    </div>
+
+    <!-- ============ DISPATCH HISTORY ============ -->
+    <section class="panel animate-slide-up" style="animation-delay: 0.3s">
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-2.5">
+          <div class="stat-icon-wrap bg-white/[0.04] text-gray-400"><i data-lucide="history" class="w-3.5 h-3.5"></i></div>
+          <h3 class="text-sm font-bold text-gray-200">Dispatch History</h3>
+          <span id="historyCount" class="text-[10px] font-mono text-gray-500 bg-gray-900 px-1.5 py-0.5 rounded">0</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="clearHistoryBtn" type="button" class="btn-ghost text-[11px] text-rose-400/70 hover:text-rose-400">
+            <i data-lucide="trash-2" class="w-3 h-3"></i>
+            <span>Clear</span>
+          </button>
+          <button id="refreshLogsBtn" type="button" class="btn-ghost text-[11px]">
+            <i data-lucide="refresh-cw" class="w-3 h-3"></i>
+            <span>Refresh</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto -mx-5 sm:-mx-6 px-5 sm:px-6">
+        <table class="w-full text-left text-xs">
+          <thead>
+            <tr class="text-[10px] uppercase tracking-wider text-gray-500 font-mono border-b border-white/[0.04]">
+              <th class="px-3 py-2.5">Time</th>
+              <th class="px-3 py-2.5">Channel</th>
+              <th class="px-3 py-2.5">Recipient</th>
+              <th class="px-3 py-2.5">Status</th>
+              <th class="px-3 py-2.5 hidden sm:table-cell">Preview</th>
+            </tr>
+          </thead>
+          <tbody id="logsTableBody" class="divide-y divide-white/[0.03]">
+            <tr>
+              <td colspan="5" class="px-3 py-8 text-center text-gray-600">
+                <i data-lucide="inbox" class="w-6 h-6 mx-auto mb-2 opacity-40"></i>
+                <p class="text-xs">No dispatch history yet</p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ===================== FOOTER ===================== -->
+  <footer class="border-t border-white/[0.04] py-4">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-gray-600">
+      <span>AutoReport AI — Built with OpenAI, Node.js & ❤️</span>
+      <div class="flex items-center gap-3">
+        <span id="connectionIndicators" class="flex items-center gap-2">
+          <span id="openaiStatusDot" class="inline-flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-gray-600"></span>OpenAI</span>
+          <span id="whatsappStatusDot" class="inline-flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-gray-600"></span>WhatsApp</span>
+        </span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Toast Container -->
+  <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
+
+  <script src="app.js"></script>
+  <script>lucide.createIcons();</script>
+</body>
+</html>
