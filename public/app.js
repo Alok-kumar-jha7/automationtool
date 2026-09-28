@@ -1,6 +1,12 @@
 // =============================================================================
-// AutoReport AI — Frontend Application Controller v3.2 (with Group Support)
+// AutoReport AI — Multi-User Application Controller v4.0
 // =============================================================================
+
+// Resolve active workspace from query parameter ?user=... or localStorage
+const initialUrlParams = new URLSearchParams(window.location.search);
+let activeUserId = initialUrlParams.get('user') || localStorage.getItem('autoreport_active_user') || 'default';
+activeUserId = activeUserId.toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 32) || 'default';
+localStorage.setItem('autoreport_active_user', activeUserId);
 
 let currentAppState = {
   isEnabled: true,
@@ -25,11 +31,29 @@ let currentWorkspaceTarget = 'contact'; // 'contact' | 'group'
 let currentModalTarget = 'contact';     // 'contact' | 'group'
 let availableWhatsAppGroups = [];
 let qrPollTimer = null;
+let allWorkspaces = [];
 
 // =============================================================================
 // DOM ELEMENTS
 // =============================================================================
 const $ = (id) => document.getElementById(id);
+
+// Workspace Switcher
+const workspaceDropdownWrapper = $('workspaceDropdownWrapper');
+const workspaceBtn = $('workspaceBtn');
+const currentWorkspaceName = $('currentWorkspaceName');
+const workspaceMenu = $('workspaceMenu');
+const workspaceListItems = $('workspaceListItems');
+const copyWorkspaceLinkBtn = $('copyWorkspaceLinkBtn');
+const openNewWorkspaceModalBtn = $('openNewWorkspaceModalBtn');
+
+// New Workspace Modal
+const newWorkspaceModal = $('newWorkspaceModal');
+const closeNewWorkspaceModalBtn = $('closeNewWorkspaceModalBtn');
+const cancelNewWorkspaceBtn = $('cancelNewWorkspaceBtn');
+const submitNewWorkspaceBtn = $('submitNewWorkspaceBtn');
+const newWorkspaceNameInput = $('newWorkspaceNameInput');
+const qrWorkspaceBadge = $('qrWorkspaceBadge');
 
 // Header
 const masterToggleBtn = $('masterToggleBtn');
@@ -612,7 +636,11 @@ function renderLogs(logs = []) {
 async function apiCall(url, options = {}) {
   const res = await fetch(url, {
     ...options,
-    headers: { 'Content-Type': 'application/json', ...options.headers },
+    headers: {
+      'Content-Type': 'application/json',
+      'x-user-id': activeUserId,
+      ...options.headers,
+    },
   });
   const text = await res.text();
   let json;
@@ -629,6 +657,110 @@ async function apiCall(url, options = {}) {
   return json;
 }
 
+// =============================================================================
+// WORKSPACES MANAGEMENT
+// =============================================================================
+async function fetchWorkspaces() {
+  try {
+    const res = await apiCall('/api/workspaces');
+    if (res.success && Array.isArray(res.data)) {
+      allWorkspaces = res.data;
+      renderWorkspacesList(res.data);
+    }
+  } catch (err) {
+    console.warn('Failed to fetch workspaces:', err.message);
+  }
+}
+
+function getMySavedWorkspaces() {
+  try {
+    const raw = localStorage.getItem('autoreport_my_workspaces');
+    let list = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(list)) list = [];
+    if (!list.includes(activeUserId)) {
+      list.push(activeUserId);
+      localStorage.setItem('autoreport_my_workspaces', JSON.stringify(list));
+    }
+    return list;
+  } catch {
+    return [activeUserId];
+  }
+}
+
+function saveMyWorkspace(id) {
+  try {
+    const list = getMySavedWorkspaces();
+    if (!list.includes(id)) {
+      list.push(id);
+      localStorage.setItem('autoreport_my_workspaces', JSON.stringify(list));
+    }
+  } catch {}
+}
+
+function renderWorkspacesList(workspaces) {
+  if (!workspaceListItems) return;
+  const current = activeUserId;
+  const currentObj = workspaces.find((w) => w.id === current);
+  const displayName = currentObj ? currentObj.name : (current === 'default' ? 'Default' : current.charAt(0).toUpperCase() + current.slice(1));
+
+  if (currentWorkspaceName) {
+    currentWorkspaceName.textContent = displayName;
+  }
+  if (qrWorkspaceBadge) {
+    qrWorkspaceBadge.textContent = displayName;
+  }
+
+  // Device Privacy: Only show workspaces this user has joined or created on this device!
+  const myIds = getMySavedWorkspaces();
+  const visibleWorkspaces = workspaces.filter((w) => myIds.includes(w.id));
+
+  // If active user isn't in server list yet, create temporary entry
+  if (!visibleWorkspaces.some((w) => w.id === current)) {
+    visibleWorkspaces.push({ id: current, name: displayName, isWhatsAppConnected: currentAppState.isWhatsAppConnected });
+  }
+
+  workspaceListItems.innerHTML = visibleWorkspaces.map((w) => {
+    const isActive = w.id === current;
+    const activeBadge = isActive ? '<span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>' : '<span class="w-1.5 h-1.5 rounded-full bg-gray-600"></span>';
+    const connBadge = w.isWhatsAppConnected 
+      ? '<span class="text-[10px] text-emerald-400 font-mono bg-emerald-500/10 px-1.5 py-0.5 rounded">WA Ready</span>'
+      : '<span class="text-[10px] text-gray-500 font-mono">Offline</span>';
+
+    return `
+      <button type="button" class="w-full text-left px-2.5 py-1.5 rounded-xl flex items-center justify-between transition cursor-pointer text-xs ${
+        isActive ? 'bg-cyan-500/15 border border-cyan-500/30 text-white font-semibold' : 'text-gray-300 hover:bg-white/[0.06]'
+      }" onclick="switchWorkspace('${escapeHtml(w.id)}')">
+        <div class="flex items-center gap-2 truncate pr-2">
+          ${activeBadge}
+          <span class="truncate">${escapeHtml(w.name || w.id)}</span>
+        </div>
+        ${connBadge}
+      </button>
+    `;
+  }).join('');
+}
+
+window.switchWorkspace = function(userId) {
+  if (!userId) return;
+  activeUserId = userId.toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 32) || 'default';
+  localStorage.setItem('autoreport_active_user', activeUserId);
+  saveMyWorkspace(activeUserId);
+
+  // Sync URL query parameter without page reload
+  const url = new URL(window.location);
+  url.searchParams.set('user', activeUserId);
+  window.history.replaceState({}, '', url);
+
+  if (workspaceMenu) workspaceMenu.classList.add('hidden');
+  availableWhatsAppGroups = [];
+  hasAttemptedGroupFetch = false;
+
+  fetchStatus();
+  fetchWorkspaces();
+  checkWhatsAppQrStatus();
+  showToast(`Switched to workspace: ${activeUserId}`, 'info');
+};
+
 let hasAttemptedGroupFetch = false;
 
 // =============================================================================
@@ -643,6 +775,7 @@ async function fetchStatus() {
         hasAttemptedGroupFetch = true;
         fetchWhatsAppGroups();
       }
+      fetchWorkspaces();
     }
   } catch (err) {
     console.error('Status fetch error:', err);
@@ -1065,7 +1198,107 @@ rawTextInput.addEventListener('input', updateWordAndCharCounts);
 enhancedOutput.addEventListener('input', updateWordAndCharCounts);
 
 // =============================================================================
+// WORKSPACE UI EVENT LISTENERS
+// =============================================================================
+
+// Toggle Workspace Dropdown
+if (workspaceBtn && workspaceMenu) {
+  workspaceBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    workspaceMenu.classList.toggle('hidden');
+    if (!workspaceMenu.classList.contains('hidden')) {
+      fetchWorkspaces();
+    }
+  });
+
+  // Close dropdown when clicking outside
+  document.addEventListener('click', (e) => {
+    if (workspaceDropdownWrapper && !workspaceDropdownWrapper.contains(e.target)) {
+      workspaceMenu.classList.add('hidden');
+    }
+  });
+}
+
+// Copy Shareable Workspace Link
+if (copyWorkspaceLinkBtn) {
+  copyWorkspaceLinkBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const shareUrl = `${window.location.origin}${window.location.pathname}?user=${encodeURIComponent(activeUserId)}`;
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      showToast(`Link copied for "${activeUserId}"! Share it with your team.`, 'success');
+      if (workspaceMenu) workspaceMenu.classList.add('hidden');
+    }).catch(() => {
+      showToast('Could not copy link to clipboard', 'error');
+    });
+  });
+}
+
+// Open New Workspace Modal
+if (openNewWorkspaceModalBtn) {
+  openNewWorkspaceModalBtn.addEventListener('click', () => {
+    if (workspaceMenu) workspaceMenu.classList.add('hidden');
+    if (newWorkspaceModal) {
+      newWorkspaceModal.classList.add('active');
+      if (newWorkspaceNameInput) {
+        newWorkspaceNameInput.value = '';
+        setTimeout(() => newWorkspaceNameInput.focus(), 100);
+      }
+    }
+  });
+}
+
+// Close New Workspace Modal
+const closeNewWorkspace = () => {
+  if (newWorkspaceModal) newWorkspaceModal.classList.remove('active');
+};
+if (closeNewWorkspaceModalBtn) closeNewWorkspaceModalBtn.addEventListener('click', closeNewWorkspace);
+if (cancelNewWorkspaceBtn) cancelNewWorkspaceBtn.addEventListener('click', closeNewWorkspace);
+
+// Submit New Workspace
+if (submitNewWorkspaceBtn) {
+  const handleCreateWorkspace = async () => {
+    const rawName = newWorkspaceNameInput ? newWorkspaceNameInput.value.trim() : '';
+    if (!rawName) {
+      showToast('Please enter your name or a workspace name', 'error');
+      if (newWorkspaceNameInput) newWorkspaceNameInput.focus();
+      return;
+    }
+
+    try {
+      submitNewWorkspaceBtn.disabled = true;
+      const res = await apiCall('/api/workspaces', {
+        method: 'POST',
+        body: JSON.stringify({ name: rawName }),
+      });
+
+      if (res.success && res.data) {
+        closeNewWorkspace();
+        showToast(`Workspace "${res.data.id}" created successfully!`, 'success');
+        switchWorkspace(res.data.id);
+      }
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      submitNewWorkspaceBtn.disabled = false;
+    }
+  };
+
+  submitNewWorkspaceBtn.addEventListener('click', handleCreateWorkspace);
+
+  if (newWorkspaceNameInput) {
+    newWorkspaceNameInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleCreateWorkspace();
+      }
+    });
+  }
+}
+
+// =============================================================================
 // INITIALIZATION
 // =============================================================================
 fetchStatus();
+fetchWorkspaces();
 setInterval(fetchStatus, 10000);
+

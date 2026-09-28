@@ -29,7 +29,7 @@ RUN npm install --omit=dev --no-audit
 COPY . .
 
 # Ensure data directory and session auth directory exist with non-root permissions
-RUN mkdir -p data .wwebjs_auth && chown -R node:node /usr/src/app
+RUN mkdir -p data/users .wwebjs_auth && chown -R node:node /usr/src/app
 
 # Switch to non-root user
 USER node

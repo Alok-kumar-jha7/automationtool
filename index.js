@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import http from 'node:http';
-import { app, rescheduleCronJob } from './server.js';
+import { app, rescheduleAllCronJobs, rescheduleCronJob } from './server.js';
 import { store } from './store.js';
 import { getAggregatedDailyWork } from './logger.js';
 import { analyzeDailyWork } from './analyzer.js';
@@ -117,8 +117,8 @@ async function main() {
     console.log(`[Server] Mobile & Laptop access ready on port ${currentPort}`);
   });
 
-  // 2. Initialize Cron Scheduler from persistent state
-  rescheduleCronJob();
+  // 2. Initialize Cron Schedulers for all active workspaces from persistent state
+  rescheduleAllCronJobs();
 
   // 3. Initialize WhatsApp Web client in background if enabled
   if (ENABLE_WHATSAPP) {

@@ -61,17 +61,18 @@ export async function dispatchReport({
   triggerType = 'manual',
   scheduledTime = null,
   skipLogging = false,
+  userId = 'default',
 }) {
-  const currentState = store.getState();
+  const currentState = store.getUserState(userId);
   const effectiveChannel = channel || currentState.dispatchChannel || 'whatsapp';
   const effectiveRecipient = recipient || currentState.recipient;
 
   // 1. Check Master Toggle Switch
   if (!currentState.isEnabled && !bypassMasterToggle) {
     const reason = 'Dispatch aborted: Master Toggle Switch is set to STOP (Disabled).';
-    console.warn(`[Dispatcher] ⏸️ ${reason}`);
+    console.warn(`[Dispatcher] [User: ${userId}] ⏸️ ${reason}`);
     if (!skipLogging) {
-      store.logExecution({
+      store.logUserExecution(userId, {
         channel: effectiveChannel,
         recipient: effectiveRecipient,
         status: 'paused',
@@ -94,18 +95,18 @@ export async function dispatchReport({
     if (effectiveChannel === 'telegram') {
       result = await sendTelegramMessage(effectiveRecipient, text);
     } else if (effectiveChannel === 'whatsapp') {
-      result = await sendWhatsAppMessage(effectiveRecipient, text);
+      result = await sendWhatsAppMessage(effectiveRecipient, text, { userId });
     } else {
       // Console / Mock channel for cloud or test environments
       console.log('\n================== [DISPATCHER: CONSOLE MOCK] ==================');
-      console.log(`To: ${effectiveRecipient || 'Console Output'}`);
+      console.log(`[User: ${userId}] To: ${effectiveRecipient || 'Console Output'}`);
       console.log(text);
       console.log('=================================================================\n');
       result = { mock: true, timestamp: new Date().toISOString() };
     }
 
     if (!skipLogging) {
-      store.logExecution({
+      store.logUserExecution(userId, {
         channel: effectiveChannel,
         recipient: effectiveRecipient,
         status: 'success',
@@ -117,9 +118,9 @@ export async function dispatchReport({
 
     return { sent: true, channel: effectiveChannel, details: result };
   } catch (error) {
-    console.error(`[Dispatcher] Failed to send via ${effectiveChannel}:`, error.message);
+    console.error(`[Dispatcher] [User: ${userId}] Failed to send via ${effectiveChannel}:`, error.message);
     if (!skipLogging) {
-      store.logExecution({
+      store.logUserExecution(userId, {
         channel: effectiveChannel,
         recipient: effectiveRecipient,
         status: 'failed',

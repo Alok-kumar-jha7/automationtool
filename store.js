@@ -2,16 +2,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const DATA_DIR = path.resolve('./data');
-const STATE_FILE = path.join(DATA_DIR, 'app_state.json');
+const USERS_DIR = path.join(DATA_DIR, 'users');
+const LEGACY_STATE_FILE = path.join(DATA_DIR, 'app_state.json');
 
-const DEFAULT_STATE = {
+export const DEFAULT_USER_STATE = {
   isEnabled: true,
   scheduleTime: '18:00',
   cronDays: '1-5', // 1-5 = Mon-Fri, * = Every day
   scheduleDate: null, // null for recurring, or 'YYYY-MM-DD' for specific date
   cronExpression: '0 18 * * 1-5',
-  recipient: process.env.TARGET_PHONE_NUMBER || '',
-  dispatchChannel: process.env.DEFAULT_DISPATCH_CHANNEL || 'whatsapp', // 'whatsapp' | 'telegram' | 'console'
+  recipient: '', // Strictly empty for new users to guarantee zero cross-user data leakage
+  dispatchChannel: 'whatsapp',
   rawText: '',
   enhancedDraft: '',
   lastSentAt: null,
@@ -19,9 +20,21 @@ const DEFAULT_STATE = {
   history: [],
 };
 
+/**
+ * Sanitizes and normalizes workspace/user IDs.
+ * Allows alphanumeric, hyphens, and underscores.
+ * @param {string} userId
+ * @returns {string}
+ */
+export function sanitizeUserId(userId) {
+  if (!userId || typeof userId !== 'string') return 'default';
+  const clean = userId.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 32);
+  return clean || 'default';
+}
+
 class StateStore {
   constructor() {
-    this.state = { ...DEFAULT_STATE };
+    this.userStates = new Map();
     this.init();
   }
 
@@ -30,65 +43,131 @@ class StateStore {
       if (!fs.existsSync(DATA_DIR)) {
         fs.mkdirSync(DATA_DIR, { recursive: true });
       }
+      if (!fs.existsSync(USERS_DIR)) {
+        fs.mkdirSync(USERS_DIR, { recursive: true });
+      }
 
-      if (fs.existsSync(STATE_FILE)) {
-        const fileData = fs.readFileSync(STATE_FILE, 'utf-8');
-        const parsed = JSON.parse(fileData);
-        this.state = { ...DEFAULT_STATE, ...parsed };
-      } else {
-        this.save();
+      // Check for legacy data/app_state.json and migrate to data/users/default.json
+      const defaultUserFile = path.join(USERS_DIR, 'default.json');
+      if (!fs.existsSync(defaultUserFile) && fs.existsSync(LEGACY_STATE_FILE)) {
+        try {
+          const legacyData = fs.readFileSync(LEGACY_STATE_FILE, 'utf-8');
+          fs.writeFileSync(defaultUserFile, legacyData, 'utf-8');
+          console.log('[Store] Migrated legacy app_state.json to users/default.json');
+        } catch (e) {
+          console.warn('[Store] Could not migrate legacy app_state.json:', e.message);
+        }
+      }
+
+      // Load all existing users in data/users/
+      const files = fs.readdirSync(USERS_DIR);
+      for (const file of files) {
+        if (file.endsWith('.json')) {
+          const uid = path.basename(file, '.json');
+          this.loadUserStateFromFile(uid);
+        }
+      }
+
+      // Ensure 'default' user is always available
+      if (!this.userStates.has('default')) {
+        this.getUserState('default');
       }
     } catch (err) {
-      console.warn('[Store] Warning: Could not read app_state.json, using defaults.', err.message);
-      this.state = { ...DEFAULT_STATE };
+      console.warn('[Store] Warning during store initialization:', err.message);
     }
   }
 
-  save() {
+  getUserFilePath(userId) {
+    const cleanId = sanitizeUserId(userId);
+    return path.join(USERS_DIR, `${cleanId}.json`);
+  }
+
+  loadUserStateFromFile(userId) {
+    const cleanId = sanitizeUserId(userId);
+    const filePath = this.getUserFilePath(cleanId);
     try {
-      if (!fs.existsSync(DATA_DIR)) {
-        fs.mkdirSync(DATA_DIR, { recursive: true });
+      if (fs.existsSync(filePath)) {
+        const raw = fs.readFileSync(filePath, 'utf-8');
+        const parsed = JSON.parse(raw);
+        const state = { ...DEFAULT_USER_STATE, ...parsed };
+        this.userStates.set(cleanId, state);
+        return state;
       }
-      fs.writeFileSync(STATE_FILE, JSON.stringify(this.state, null, 2), 'utf-8');
     } catch (err) {
-      console.error('[Store] Failed to write app_state.json:', err.message);
+      console.warn(`[Store] Could not read user state for "${cleanId}":`, err.message);
+    }
+    const fallback = { ...DEFAULT_USER_STATE };
+    this.userStates.set(cleanId, fallback);
+    this.saveUserState(cleanId);
+    return fallback;
+  }
+
+  saveUserState(userId) {
+    const cleanId = sanitizeUserId(userId);
+    const state = this.userStates.get(cleanId) || { ...DEFAULT_USER_STATE };
+    try {
+      if (!fs.existsSync(USERS_DIR)) {
+        fs.mkdirSync(USERS_DIR, { recursive: true });
+      }
+      const filePath = this.getUserFilePath(cleanId);
+      fs.writeFileSync(filePath, JSON.stringify(state, null, 2), 'utf-8');
+
+      // Also mirror to legacy app_state.json if userId is default
+      if (cleanId === 'default') {
+        fs.writeFileSync(LEGACY_STATE_FILE, JSON.stringify(state, null, 2), 'utf-8');
+      }
+    } catch (err) {
+      console.error(`[Store] Failed to save state for user "${cleanId}":`, err.message);
     }
   }
 
-  getState() {
-    return { ...this.state };
+  getUserState(userId = 'default') {
+    const cleanId = sanitizeUserId(userId);
+    if (!this.userStates.has(cleanId)) {
+      return this.loadUserStateFromFile(cleanId);
+    }
+    return { ...this.userStates.get(cleanId) };
   }
 
-  update(updates) {
-    this.state = {
-      ...this.state,
+  updateUserState(userId = 'default', updates = {}) {
+    const cleanId = sanitizeUserId(userId);
+    const current = this.getUserState(cleanId);
+
+    const merged = {
+      ...current,
       ...updates,
     };
 
-    // If time, days, or specific date were updated, automatically recalculate cronExpression
+    // If time, days, or specific date were updated, recalculate cronExpression
     if (updates.scheduleTime || updates.cronDays || updates.scheduleDate !== undefined) {
-      const [hour = '18', min = '00'] = (this.state.scheduleTime || '18:00').split(':');
-      if (this.state.scheduleDate && /^\d{4}-\d{2}-\d{2}$/.test(this.state.scheduleDate)) {
-        const parts = this.state.scheduleDate.split('-');
+      const [hour = '18', min = '00'] = (merged.scheduleTime || '18:00').split(':');
+      if (merged.scheduleDate && /^\d{4}-\d{2}-\d{2}$/.test(merged.scheduleDate)) {
+        const parts = merged.scheduleDate.split('-');
         const dayOfMonth = parseInt(parts[2], 10);
         const month = parseInt(parts[1], 10);
-        this.state.cronExpression = `${parseInt(min, 10)} ${parseInt(hour, 10)} ${dayOfMonth} ${month} *`;
+        merged.cronExpression = `${parseInt(min, 10)} ${parseInt(hour, 10)} ${dayOfMonth} ${month} *`;
       } else {
-        const days = this.state.cronDays || '1-5';
-        this.state.cronExpression = `${parseInt(min, 10)} ${parseInt(hour, 10)} * * ${days}`;
+        const days = merged.cronDays || '1-5';
+        merged.cronExpression = `${parseInt(min, 10)} ${parseInt(hour, 10)} * * ${days}`;
       }
     }
 
-    this.save();
-    return this.getState();
+    this.userStates.set(cleanId, merged);
+    this.saveUserState(cleanId);
+    return { ...merged };
   }
 
-  toggleMaster(enabled) {
-    const isEnabled = typeof enabled === 'boolean' ? enabled : !this.state.isEnabled;
-    return this.update({ isEnabled });
+  toggleUserMaster(userId = 'default', enabled) {
+    const cleanId = sanitizeUserId(userId);
+    const current = this.getUserState(cleanId);
+    const isEnabled = typeof enabled === 'boolean' ? enabled : !current.isEnabled;
+    return this.updateUserState(cleanId, { isEnabled });
   }
 
-  logExecution({ channel, recipient, status, preview, error = null, triggerType = 'manual', scheduledTime = null, triggerAt = null }) {
+  logUserExecution(userId = 'default', { channel, recipient, status, preview, error = null, triggerType = 'manual', scheduledTime = null, triggerAt = null }) {
+    const cleanId = sanitizeUserId(userId);
+    const current = this.getUserState(cleanId);
+
     const entry = {
       id: Date.now().toString(),
       timestamp: new Date().toISOString(),
@@ -98,16 +177,58 @@ class StateStore {
       preview: preview ? preview.slice(0, 140) + '...' : '',
       error: error ? String(error) : null,
       triggerType, // 'scheduled' | 'manual'
-      scheduledTime: scheduledTime || null, // e.g. "21:00"
-      triggerAt: triggerAt || new Date().toISOString(), // actual trigger timestamp
+      scheduledTime: scheduledTime || null,
+      triggerAt: triggerAt || new Date().toISOString(),
     };
 
-    const history = [entry, ...(this.state.history || [])].slice(0, 100); // Keep last 100
-    return this.update({
+    const history = [entry, ...(current.history || [])].slice(0, 100);
+    return this.updateUserState(cleanId, {
       history,
-      lastSentAt: status === 'success' ? entry.timestamp : this.state.lastSentAt,
+      lastSentAt: status === 'success' ? entry.timestamp : current.lastSentAt,
       lastStatus: status,
     });
+  }
+
+  listWorkspaces() {
+    try {
+      if (!fs.existsSync(USERS_DIR)) return [{ id: 'default', name: 'Default Workspace' }];
+      const files = fs.readdirSync(USERS_DIR);
+      const workspaces = [];
+
+      for (const file of files) {
+        if (file.endsWith('.json')) {
+          const id = path.basename(file, '.json');
+          workspaces.push({
+            id,
+            name: id === 'default' ? 'Default Workspace' : id.charAt(0).toUpperCase() + id.slice(1),
+          });
+        }
+      }
+
+      if (workspaces.length === 0) {
+        workspaces.push({ id: 'default', name: 'Default Workspace' });
+      }
+      return workspaces;
+    } catch {
+      return [{ id: 'default', name: 'Default Workspace' }];
+    }
+  }
+
+  // Backward compatibility delegates
+  getState() {
+    return this.getUserState('default');
+  }
+
+  update(updates) {
+    return this.updateUserState('default', updates);
+  }
+
+  toggleMaster(enabled) {
+    return this.toggleUserMaster('default', enabled);
+  }
+
+  logExecution(logData) {
+    return this.logUserExecution('default', logData);
   }
 }
 

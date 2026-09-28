@@ -15,3 +15,8 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
+
+# Persisted User Data & Private State
+data/app_state.json
+data/users/*.json
+!data/users/.gitkeep

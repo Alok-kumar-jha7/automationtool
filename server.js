@@ -5,7 +5,7 @@ import rateLimit from 'express-rate-limit';
 import path from 'node:path';
 import cron from 'node-cron';
 import { fileURLToPath } from 'node:url';
-import { store } from './store.js';
+import { store, sanitizeUserId } from './store.js';
 import { analyzeDailyWork } from './analyzer.js';
 import { getAggregatedDailyWork } from './logger.js';
 import { dispatchReport } from './dispatcher.js';
@@ -60,6 +60,13 @@ const globalLimiter = rateLimit({
   message: { success: false, error: 'Too many requests. Please slow down.' },
 });
 app.use('/api/', globalLimiter);
+
+// Multi-tenant user extractor middleware
+app.use('/api', (req, res, next) => {
+  const rawUser = req.headers['x-user-id'] || req.query.user || req.body?.userId || 'default';
+  req.userId = sanitizeUserId(String(rawUser));
+  next();
+});
 
 // Strict rate limiter for AI endpoint (expensive API calls)
 const aiLimiter = rateLimit({
@@ -119,45 +126,47 @@ app.use(express.static(path.join(__dirname, 'public'), {
 }));
 
 // =============================================================================
-// CRON SCHEDULER
+// MULTI-TENANT CRON SCHEDULER
 // =============================================================================
-let activeCronTask = null;
+const activeCronTasks = new Map(); // userId -> cronTask
 
 /**
- * Reschedules the active node-cron task from the persisted state.
+ * Reschedules the active node-cron task for a specific user from their persisted state.
+ * @param {string} [userId='default']
  */
-export function rescheduleCronJob() {
-  const state = store.getState();
+export function rescheduleCronJobForUser(userId = 'default') {
+  const cleanId = sanitizeUserId(userId);
+  const state = store.getUserState(cleanId);
 
-  if (activeCronTask) {
-    activeCronTask.stop();
-    activeCronTask = null;
-    console.log('[Scheduler] Stopped previous cron schedule.');
+  if (activeCronTasks.has(cleanId)) {
+    const existing = activeCronTasks.get(cleanId);
+    existing.stop();
+    activeCronTasks.delete(cleanId);
+    console.log(`[Scheduler] [User: ${cleanId}] Stopped previous cron schedule.`);
   }
 
   const cronExpression = state.cronExpression || '0 18 * * 1-5';
 
   if (!cron.validate(cronExpression)) {
-    console.error(`[Scheduler] Invalid cron expression: "${cronExpression}"`);
+    console.error(`[Scheduler] [User: ${cleanId}] Invalid cron expression: "${cronExpression}"`);
     return false;
   }
 
-  console.log(`[Scheduler] ⏰ Scheduling cron: "${cronExpression}" (Enabled: ${state.isEnabled})`);
+  console.log(`[Scheduler] [User: ${cleanId}] ⏰ Scheduling cron: "${cronExpression}" (Enabled: ${state.isEnabled})`);
   const nextTime = getNextCronTriggerTime(state.scheduleTime, state.cronDays, state.scheduleDate);
   if (nextTime) {
-    console.log(`[Scheduler] Next trigger at: ${nextTime}`);
+    console.log(`[Scheduler] [User: ${cleanId}] Next trigger at: ${nextTime}`);
   }
 
-  activeCronTask = cron.schedule(cronExpression, async () => {
+  const task = cron.schedule(cronExpression, async () => {
     const triggerTime = new Date().toISOString();
-    const currentState = store.getState();
-    console.log(`\n[Scheduler] ⏰ CRON TRIGGER FIRED at ${new Date().toLocaleTimeString()}`);
-    console.log(`[Scheduler] Schedule was: ${currentState.scheduleTime} | Channel: ${currentState.dispatchChannel} | Recipient: ${currentState.recipient}`);
+    const currentState = store.getUserState(cleanId);
+    console.log(`\n[Scheduler] [User: ${cleanId}] ⏰ CRON TRIGGER FIRED at ${new Date().toLocaleTimeString()}`);
+    console.log(`[Scheduler] [User: ${cleanId}] Schedule: ${currentState.scheduleTime} | Channel: ${currentState.dispatchChannel} | Recipient: ${currentState.recipient}`);
 
-    // Log that the schedule triggered (regardless of enabled state)
     if (!currentState.isEnabled) {
-      console.log('[Scheduler] ⏸️ Skipped: Automation is PAUSED.');
-      store.logExecution({
+      console.log(`[Scheduler] [User: ${cleanId}] ⏸️ Skipped: Automation is PAUSED.`);
+      store.logUserExecution(cleanId, {
         channel: currentState.dispatchChannel,
         recipient: currentState.recipient,
         status: 'paused',
@@ -172,10 +181,10 @@ export function rescheduleCronJob() {
     try {
       let textToSend = currentState.enhancedDraft;
       if (!textToSend || textToSend.trim().length === 0) {
-        console.log('[Scheduler] No draft found. Ingesting daily work notes & git logs...');
+        console.log(`[Scheduler] [User: ${cleanId}] No draft found. Ingesting daily work notes & git logs...`);
         const aggregated = await getAggregatedDailyWork();
         textToSend = await analyzeDailyWork(aggregated.rawContent);
-        store.update({ rawText: aggregated.rawContent, enhancedDraft: textToSend });
+        store.updateUserState(cleanId, { rawText: aggregated.rawContent, enhancedDraft: textToSend });
       }
 
       await dispatchReport({
@@ -185,9 +194,10 @@ export function rescheduleCronJob() {
         triggerType: 'scheduled',
         scheduledTime: currentState.scheduleTime,
         skipLogging: true,
+        userId: cleanId,
       });
 
-      store.logExecution({
+      store.logUserExecution(cleanId, {
         channel: currentState.dispatchChannel,
         recipient: currentState.recipient,
         status: 'success',
@@ -197,10 +207,10 @@ export function rescheduleCronJob() {
         triggerAt: triggerTime,
       });
 
-      console.log('[Scheduler] ✅ Scheduled report dispatched successfully!');
+      console.log(`[Scheduler] [User: ${cleanId}] ✅ Scheduled report dispatched successfully!`);
     } catch (err) {
-      console.error('[Scheduler] ❌ Dispatch failed:', err.message);
-      store.logExecution({
+      console.error(`[Scheduler] [User: ${cleanId}] ❌ Dispatch failed:`, err.message);
+      store.logUserExecution(cleanId, {
         channel: currentState.dispatchChannel,
         recipient: currentState.recipient,
         status: 'failed',
@@ -213,8 +223,23 @@ export function rescheduleCronJob() {
     }
   });
 
+  activeCronTasks.set(cleanId, task);
   return true;
 }
+
+/**
+ * Reschedules all cron tasks for all known workspaces.
+ */
+export function rescheduleAllCronJobs() {
+  const workspaces = store.listWorkspaces();
+  console.log(`[Scheduler] Rescheduling cron jobs for ${workspaces.length} workspace(s)...`);
+  for (const w of workspaces) {
+    rescheduleCronJobForUser(w.id);
+  }
+}
+
+// Backward compatibility alias
+export const rescheduleCronJob = (userId = 'default') => rescheduleCronJobForUser(userId);
 
 /**
  * Calculates the next cron trigger time as a human-readable string.
@@ -265,15 +290,56 @@ export { getNextCronTriggerTime };
 // REST API ENDPOINTS
 // =============================================================================
 
-// GET /api/status — Full current state + connectivity checks + next trigger
+// GET /api/workspaces — List all existing workspaces
+app.get('/api/workspaces', (req, res) => {
+  const workspaces = store.listWorkspaces().map((w) => ({
+    ...w,
+    isWhatsAppConnected: isWhatsAppReady(w.id),
+  }));
+  res.json({
+    success: true,
+    data: workspaces,
+    currentUserId: req.userId,
+  });
+});
+
+// POST /api/workspaces — Create or initialize a new workspace
+app.post('/api/workspaces', (req, res) => {
+  try {
+    const rawName = req.body.name || req.body.id || '';
+    const cleanId = sanitizeUserId(rawName);
+    if (!cleanId) {
+      return res.status(400).json({ success: false, error: 'Valid workspace name is required.' });
+    }
+
+    const state = store.getUserState(cleanId);
+    rescheduleCronJobForUser(cleanId);
+
+    res.json({
+      success: true,
+      data: {
+        id: cleanId,
+        name: cleanId === 'default' ? 'Default Workspace' : cleanId.charAt(0).toUpperCase() + cleanId.slice(1),
+        state,
+      },
+      message: `Workspace "${cleanId}" is ready.`,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/status — Full current state for active user workspace
 app.get('/api/status', (req, res) => {
-  const state = store.getState();
+  const uid = req.userId;
+  const state = store.getUserState(uid);
   const nextTriggerAt = getNextCronTriggerTime(state.scheduleTime, state.cronDays, state.scheduleDate);
-  const whatsappAuth = getWhatsAppAuthStatus();
+  const whatsappAuth = getWhatsAppAuthStatus(uid);
   res.json({
     success: true,
     data: {
       ...state,
+      userId: uid,
       nextTriggerAt,
       isWhatsAppConnected: whatsappAuth.isReady,
       whatsappAuth,
@@ -285,9 +351,9 @@ app.get('/api/status', (req, res) => {
   });
 });
 
-// GET /api/whatsapp/status — Real-time WhatsApp connection & QR code
+// GET /api/whatsapp/status — Real-time WhatsApp connection & QR code for active user
 app.get('/api/whatsapp/status', (req, res) => {
-  const auth = getWhatsAppAuthStatus();
+  const auth = getWhatsAppAuthStatus(req.userId);
   res.json({
     success: true,
     data: auth,
@@ -297,7 +363,7 @@ app.get('/api/whatsapp/status', (req, res) => {
 // GET /api/whatsapp/groups — Get list of WhatsApp groups the user is part of
 app.get('/api/whatsapp/groups', async (req, res) => {
   try {
-    const groups = await getWhatsAppGroups();
+    const groups = await getWhatsAppGroups(req.userId);
     res.json({
       success: true,
       data: groups,
@@ -307,12 +373,12 @@ app.get('/api/whatsapp/groups', async (req, res) => {
   }
 });
 
-// POST /api/whatsapp/reconnect — Trigger new QR code generation
+// POST /api/whatsapp/reconnect — Trigger new QR code generation for active user
 app.post('/api/whatsapp/reconnect', async (req, res) => {
   try {
-    console.log('[API] User requested WhatsApp client reconnect/new QR');
-    reconnectWhatsAppClient().catch((err) => {
-      console.warn('[WhatsApp] Reconnect notice:', err.message);
+    console.log(`[API] [User: ${req.userId}] User requested WhatsApp client reconnect/new QR`);
+    reconnectWhatsAppClient(req.userId).catch((err) => {
+      console.warn(`[WhatsApp] [User: ${req.userId}] Reconnect notice:`, err.message);
     });
     res.json({
       success: true,
@@ -323,11 +389,11 @@ app.post('/api/whatsapp/reconnect', async (req, res) => {
   }
 });
 
-// POST /api/toggle — Start/Stop master automation switch
+// POST /api/toggle — Start/Stop master automation switch for active user
 app.post('/api/toggle', (req, res) => {
   const { isEnabled } = req.body;
-  const updatedState = store.toggleMaster(isEnabled);
-  console.log(`[API] Master Toggle: ${updatedState.isEnabled ? '🟢 RUNNING' : '🔴 PAUSED'}`);
+  const updatedState = store.toggleUserMaster(req.userId, isEnabled);
+  console.log(`[API] [User: ${req.userId}] Master Toggle: ${updatedState.isEnabled ? '🟢 RUNNING' : '🔴 PAUSED'}`);
   res.json({
     success: true,
     data: updatedState,
@@ -348,7 +414,7 @@ app.post('/api/preview', aiLimiter, async (req, res) => {
     }
 
     const enhanced = await analyzeDailyWork(rawText);
-    store.update({ rawText, enhancedDraft: enhanced });
+    store.updateUserState(req.userId, { rawText, enhancedDraft: enhanced });
 
     res.json({
       success: true,
@@ -360,14 +426,13 @@ app.post('/api/preview', aiLimiter, async (req, res) => {
   }
 });
 
-// POST /api/schedule — Save dispatch configuration
+// POST /api/schedule — Save dispatch configuration for active user
 app.post('/api/schedule', (req, res) => {
   try {
     const { scheduleTime, cronDays, scheduleDate, recipient, dispatchChannel, rawText, enhancedDraft, isEnabled } = req.body;
 
     const updates = {};
     if (scheduleTime !== undefined) {
-      // Validate HH:MM format
       if (!/^\d{1,2}:\d{2}$/.test(scheduleTime)) {
         return res.status(400).json({ success: false, error: 'Invalid time format. Use HH:MM.' });
       }
@@ -403,8 +468,8 @@ app.post('/api/schedule', (req, res) => {
     if (enhancedDraft !== undefined) updates.enhancedDraft = sanitize(enhancedDraft, 10000);
     if (isEnabled !== undefined) updates.isEnabled = Boolean(isEnabled);
 
-    const newState = store.update(updates);
-    rescheduleCronJob();
+    const newState = store.updateUserState(req.userId, updates);
+    rescheduleCronJobForUser(req.userId);
 
     res.json({
       success: true,
@@ -420,7 +485,7 @@ app.post('/api/schedule', (req, res) => {
 app.post('/api/send-now', dispatchLimiter, async (req, res) => {
   try {
     const { text, channel, recipient } = req.body;
-    const currentState = store.getState();
+    const currentState = store.getUserState(req.userId);
 
     const messageText = sanitize(text || currentState.enhancedDraft, 10000);
     if (!messageText || messageText.trim().length === 0) {
@@ -450,10 +515,10 @@ app.post('/api/send-now', dispatchLimiter, async (req, res) => {
       return res.status(400).json({ success: false, error: 'Invalid dispatch channel.' });
     }
 
-    if (effectiveChannel === 'whatsapp' && !isWhatsAppReady()) {
+    if (effectiveChannel === 'whatsapp' && !isWhatsAppReady(req.userId)) {
       return res.status(400).json({
         success: false,
-        error: 'WhatsApp is not connected. Please scan the QR code to log in first.',
+        error: 'WhatsApp is not connected for this workspace. Please scan the QR code to log in first.',
         needsWhatsAppLogin: true,
       });
     }
@@ -463,6 +528,7 @@ app.post('/api/send-now', dispatchLimiter, async (req, res) => {
       channel: effectiveChannel,
       recipient: targetRecipient,
       bypassMasterToggle: true,
+      userId: req.userId,
     });
 
     res.json({
@@ -471,37 +537,50 @@ app.post('/api/send-now', dispatchLimiter, async (req, res) => {
       message: `Report dispatched to ${targetRecipient} via ${result.channel}!`,
     });
   } catch (error) {
-    console.error('[API /send-now Error]:', error.message);
+    console.error(`[API /send-now Error] [User: ${req.userId}]:`, error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// POST /api/work-log/load — Read from local markdown & git
+// POST /api/work-log/load — Read from local markdown & git (isolated per user)
 app.post('/api/work-log/load', async (req, res) => {
   try {
-    const aggregated = await getAggregatedDailyWork();
-    res.json({
-      success: true,
-      data: {
-        rawContent: aggregated.rawContent,
-        sources: aggregated.sources,
-        hasData: aggregated.hasData,
-      },
-    });
+    if (req.userId === 'default') {
+      const aggregated = await getAggregatedDailyWork();
+      res.json({
+        success: true,
+        data: {
+          rawContent: aggregated.rawContent,
+          sources: aggregated.sources,
+          hasData: aggregated.hasData,
+        },
+      });
+    } else {
+      // Non-default users: strictly isolated. Only load their own saved draft notes
+      const userState = store.getUserState(req.userId);
+      res.json({
+        success: true,
+        data: {
+          rawContent: userState.rawText || '',
+          sources: userState.rawText ? ['Workspace Draft'] : [],
+          hasData: Boolean(userState.rawText && userState.rawText.trim().length > 0),
+        },
+      });
+    }
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// GET /api/logs — Dispatch history
+// GET /api/logs — Dispatch history for active user
 app.get('/api/logs', (req, res) => {
-  const state = store.getState();
+  const state = store.getUserState(req.userId);
   res.json({ success: true, data: state.history || [] });
 });
 
-// POST /api/clear-history — Wipe dispatch logs
+// POST /api/clear-history — Wipe dispatch logs for active user
 app.post('/api/clear-history', (req, res) => {
-  store.update({ history: [] });
+  store.updateUserState(req.userId, { history: [] });
   res.json({ success: true, message: 'Dispatch history cleared.' });
 });
 
