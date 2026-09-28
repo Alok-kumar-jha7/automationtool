@@ -226,6 +226,7 @@ export function initWhatsAppClient(userId = 'default', options = {}) {
         session.latestQrString = null;
         session.latestQrDataUrl = null;
         session.clientInitPromise = null;
+        session.clientInstance = null;
       });
 
       // Event: Puppeteer browser crash or error

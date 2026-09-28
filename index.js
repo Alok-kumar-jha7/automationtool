@@ -13,6 +13,15 @@ import {
 const PORT = process.env.PORT || 3000;
 const ENABLE_WHATSAPP = process.env.ENABLE_WHATSAPP !== 'false';
 
+// Prevent server crash from Puppeteer file locks (e.g. EBUSY on unlink during logout)
+process.on('unhandledRejection', (reason) => {
+  console.warn('[Process] Handled unhandledRejection:', reason?.message || reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.warn('[Process] Handled uncaughtException:', err?.message || err);
+});
+
 /**
  * CLI Orchestrator: Ingests activity -> Analyzes with LLM -> Dispatches report
  * 
