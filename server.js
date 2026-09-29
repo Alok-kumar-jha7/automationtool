@@ -65,8 +65,33 @@ app.use('/api/', globalLimiter);
 app.use('/api', (req, res, next) => {
   const rawUser = req.headers['x-user-id'] || req.query.user || req.body?.userId || 'default';
   req.userId = sanitizeUserId(String(rawUser));
+  req.sessionToken = req.headers['x-session-token'] || null;
   next();
 });
+
+/**
+ * Token authentication middleware.
+ * Validates x-session-token header matches the stored token for x-user-id.
+ * Applied to all data-access endpoints to prevent cross-user access.
+ */
+function requireAuth(req, res, next) {
+  // Allow workspace creation and health endpoints without auth
+  if (!req.sessionToken) {
+    return res.status(401).json({
+      success: false,
+      error: 'Authentication required. Please create or log into a workspace.',
+      needsOnboarding: true,
+    });
+  }
+  if (!store.validateSessionToken(req.userId, req.sessionToken)) {
+    return res.status(403).json({
+      success: false,
+      error: 'Invalid session token. Please re-authenticate.',
+      needsOnboarding: true,
+    });
+  }
+  next();
+}
 
 // Strict rate limiter for AI endpoint (expensive API calls)
 const aiLimiter = rateLimit({
@@ -229,9 +254,10 @@ export function rescheduleCronJobForUser(userId = 'default') {
 
 /**
  * Reschedules all cron tasks for all known workspaces.
+ * Uses listAllWorkspaces (internal) — not the user-scoped public API.
  */
 export function rescheduleAllCronJobs() {
-  const workspaces = store.listWorkspaces();
+  const workspaces = store.listAllWorkspaces();
   console.log(`[Scheduler] Rescheduling cron jobs for ${workspaces.length} workspace(s)...`);
   for (const w of workspaces) {
     rescheduleCronJobForUser(w.id);
@@ -290,9 +316,9 @@ export { getNextCronTriggerTime };
 // REST API ENDPOINTS
 // =============================================================================
 
-// GET /api/workspaces — List all existing workspaces
-app.get('/api/workspaces', (req, res) => {
-  const workspaces = store.listWorkspaces().map((w) => ({
+// GET /api/workspaces — Only returns the authenticated user's own workspace
+app.get('/api/workspaces', requireAuth, (req, res) => {
+  const workspaces = store.listWorkspaces(req.userId).map((w) => ({
     ...w,
     isWhatsAppConnected: isWhatsAppReady(w.id),
   }));
@@ -303,7 +329,7 @@ app.get('/api/workspaces', (req, res) => {
   });
 });
 
-// POST /api/workspaces — Create or initialize a new workspace
+// POST /api/workspaces — Create or initialize a new workspace (no auth required — this IS the signup)
 app.post('/api/workspaces', (req, res) => {
   try {
     const rawName = req.body.name || req.body.id || '';
@@ -313,6 +339,8 @@ app.post('/api/workspaces', (req, res) => {
     }
 
     const state = store.getUserState(cleanId);
+    const { sessionToken: _existingToken, ...safeState } = state;
+    const sessionToken = store.ensureSessionToken(cleanId);
     rescheduleCronJobForUser(cleanId);
 
     res.json({
@@ -320,7 +348,8 @@ app.post('/api/workspaces', (req, res) => {
       data: {
         id: cleanId,
         name: cleanId === 'default' ? 'Default Workspace' : cleanId.charAt(0).toUpperCase() + cleanId.slice(1),
-        state,
+        sessionToken,
+        state: safeState,
       },
       message: `Workspace "${cleanId}" is ready.`,
     });
@@ -329,16 +358,18 @@ app.post('/api/workspaces', (req, res) => {
   }
 });
 
-// GET /api/status — Full current state for active user workspace
-app.get('/api/status', (req, res) => {
+// GET /api/status — Full current state for active user workspace (auth required)
+app.get('/api/status', requireAuth, (req, res) => {
   const uid = req.userId;
   const state = store.getUserState(uid);
+  // Strip sensitive token from API response
+  const { sessionToken: _st, ...safeState } = state;
   const nextTriggerAt = getNextCronTriggerTime(state.scheduleTime, state.cronDays, state.scheduleDate);
   const whatsappAuth = getWhatsAppAuthStatus(uid);
   res.json({
     success: true,
     data: {
-      ...state,
+      ...safeState,
       userId: uid,
       nextTriggerAt,
       isWhatsAppConnected: whatsappAuth.isReady,
@@ -351,8 +382,8 @@ app.get('/api/status', (req, res) => {
   });
 });
 
-// GET /api/whatsapp/status — Real-time WhatsApp connection & QR code for active user
-app.get('/api/whatsapp/status', (req, res) => {
+// GET /api/whatsapp/status — Real-time WhatsApp connection & QR code for active user (auth required)
+app.get('/api/whatsapp/status', requireAuth, (req, res) => {
   const auth = getWhatsAppAuthStatus(req.userId);
   res.json({
     success: true,
@@ -360,8 +391,8 @@ app.get('/api/whatsapp/status', (req, res) => {
   });
 });
 
-// GET /api/whatsapp/groups — Get list of WhatsApp groups the user is part of
-app.get('/api/whatsapp/groups', async (req, res) => {
+// GET /api/whatsapp/groups — Get list of WhatsApp groups the user is part of (auth required)
+app.get('/api/whatsapp/groups', requireAuth, async (req, res) => {
   try {
     const groups = await getWhatsAppGroups(req.userId);
     res.json({
@@ -373,8 +404,8 @@ app.get('/api/whatsapp/groups', async (req, res) => {
   }
 });
 
-// POST /api/whatsapp/reconnect — Trigger new QR code generation for active user
-app.post('/api/whatsapp/reconnect', async (req, res) => {
+// POST /api/whatsapp/reconnect — Trigger new QR code generation for active user (auth required)
+app.post('/api/whatsapp/reconnect', requireAuth, async (req, res) => {
   try {
     console.log(`[API] [User: ${req.userId}] User requested WhatsApp client reconnect/new QR`);
     reconnectWhatsAppClient(req.userId).catch((err) => {
@@ -389,8 +420,8 @@ app.post('/api/whatsapp/reconnect', async (req, res) => {
   }
 });
 
-// POST /api/toggle — Start/Stop master automation switch for active user
-app.post('/api/toggle', (req, res) => {
+// POST /api/toggle — Start/Stop master automation switch for active user (auth required)
+app.post('/api/toggle', requireAuth, (req, res) => {
   const { isEnabled } = req.body;
   const updatedState = store.toggleUserMaster(req.userId, isEnabled);
   console.log(`[API] [User: ${req.userId}] Master Toggle: ${updatedState.isEnabled ? '🟢 RUNNING' : '🔴 PAUSED'}`);
@@ -401,8 +432,8 @@ app.post('/api/toggle', (req, res) => {
   });
 });
 
-// POST /api/preview — AI enhancement preview (rate-limited)
-app.post('/api/preview', aiLimiter, async (req, res) => {
+// POST /api/preview — AI enhancement preview (rate-limited, auth required)
+app.post('/api/preview', requireAuth, aiLimiter, async (req, res) => {
   try {
     const rawText = sanitize(req.body.rawText, 10000);
 
@@ -426,8 +457,8 @@ app.post('/api/preview', aiLimiter, async (req, res) => {
   }
 });
 
-// POST /api/schedule — Save dispatch configuration for active user
-app.post('/api/schedule', (req, res) => {
+// POST /api/schedule — Save dispatch configuration for active user (auth required)
+app.post('/api/schedule', requireAuth, (req, res) => {
   try {
     const { scheduleTime, cronDays, scheduleDate, recipient, dispatchChannel, rawText, enhancedDraft, isEnabled } = req.body;
 
@@ -481,8 +512,8 @@ app.post('/api/schedule', (req, res) => {
   }
 });
 
-// POST /api/send-now — Instant manual dispatch (rate-limited)
-app.post('/api/send-now', dispatchLimiter, async (req, res) => {
+// POST /api/send-now — Instant manual dispatch (rate-limited, auth required)
+app.post('/api/send-now', requireAuth, dispatchLimiter, async (req, res) => {
   try {
     const { text, channel, recipient } = req.body;
     const currentState = store.getUserState(req.userId);
@@ -542,8 +573,8 @@ app.post('/api/send-now', dispatchLimiter, async (req, res) => {
   }
 });
 
-// POST /api/work-log/load — Read from local markdown & git (isolated per user)
-app.post('/api/work-log/load', async (req, res) => {
+// POST /api/work-log/load — Read from local markdown & git (isolated per user, auth required)
+app.post('/api/work-log/load', requireAuth, async (req, res) => {
   try {
     if (req.userId === 'default') {
       const aggregated = await getAggregatedDailyWork();
@@ -572,14 +603,14 @@ app.post('/api/work-log/load', async (req, res) => {
   }
 });
 
-// GET /api/logs — Dispatch history for active user
-app.get('/api/logs', (req, res) => {
+// GET /api/logs — Dispatch history for active user (auth required)
+app.get('/api/logs', requireAuth, (req, res) => {
   const state = store.getUserState(req.userId);
   res.json({ success: true, data: state.history || [] });
 });
 
-// POST /api/clear-history — Wipe dispatch logs for active user
-app.post('/api/clear-history', (req, res) => {
+// POST /api/clear-history — Wipe dispatch logs for active user (auth required)
+app.post('/api/clear-history', requireAuth, (req, res) => {
   store.updateUserState(req.userId, { history: [] });
   res.json({ success: true, message: 'Dispatch history cleared.' });
 });

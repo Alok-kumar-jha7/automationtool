@@ -6,7 +6,6 @@ import { getAggregatedDailyWork } from './logger.js';
 import { analyzeDailyWork } from './analyzer.js';
 import { dispatchReport } from './dispatcher.js';
 import {
-  initWhatsAppClient,
   destroyWhatsAppClient,
 } from './whatsapp.js';
 
@@ -129,19 +128,10 @@ async function main() {
   // 2. Initialize Cron Schedulers for all active workspaces from persistent state
   rescheduleAllCronJobs();
 
-  // 3. Initialize WhatsApp Web client in background if enabled
+  // 3. WhatsApp clients are lazily initialized per-user when they open the QR modal.
+  // No auto-init on boot — saves server resources for multi-user mode.
   if (ENABLE_WHATSAPP) {
-    console.log('[WhatsApp] Background initialization started...');
-    initWhatsAppClient()
-      .then(() => {
-        console.log('[WhatsApp] Background connection established.');
-      })
-      .catch((err) => {
-        console.warn(
-          '[WhatsApp] Background init notice: QR scan pending or puppeteer headless environment notice:',
-          err.message
-        );
-      });
+    console.log('[WhatsApp] Per-user lazy initialization enabled. Sessions start when users scan QR.');
   } else {
     console.log('[WhatsApp] WhatsApp Web client disabled via ENABLE_WHATSAPP=false (Using Cloud/Telegram/Console).');
   }

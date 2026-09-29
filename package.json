@@ -5,9 +5,9 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "run-now": "node index.js --run-now",
-    "test-report": "node index.js --test-only"
+    "start": "node --max-old-space-size=192 index.js",
+    "run-now": "node --max-old-space-size=192 index.js --run-now",
+    "test-report": "node --max-old-space-size=192 index.js --test-only"
   },
   "keywords": [
     "whatsapp",

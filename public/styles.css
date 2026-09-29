@@ -142,7 +142,7 @@ select.select-primary { cursor: pointer; background-image: url("data:image/svg+x
 /* ============================================================================
    BUTTONS
    ============================================================================ */
-.btn-primary-glow {
+.btn-primary-glow, .btn-primary {
   display: flex; align-items: center; justify-content: center; gap: 0.5rem;
   padding: 0.75rem 1.25rem; border-radius: 0.875rem;
   font-size: 0.82rem; font-weight: 700;
@@ -152,12 +152,12 @@ select.select-primary { cursor: pointer; background-image: url("data:image/svg+x
   transition: all 0.2s;
   cursor: pointer; border: none;
 }
-.btn-primary-glow:hover {
+.btn-primary-glow:hover, .btn-primary:hover {
   box-shadow: 0 6px 30px rgba(52,211,153,0.3), 0 0 0 1px rgba(52,211,153,0.4) inset;
   transform: translateY(-1px);
 }
-.btn-primary-glow:active { transform: translateY(0) scale(0.99); }
-.btn-primary-glow:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+.btn-primary-glow:active, .btn-primary:active { transform: translateY(0) scale(0.99); }
+.btn-primary-glow:disabled, .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
 
 .btn-secondary {
   display: flex; align-items: center; justify-content: center; gap: 0.5rem;
@@ -510,6 +510,66 @@ body {
   .template-chip {
     font-size: 0.62rem;
     padding: 0.25rem 0.5rem;
+  }
+}
+
+/* ============================================================================
+   ONBOARDING OVERLAY
+   ============================================================================ */
+.onboarding-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(3, 7, 18, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  opacity: 1;
+  transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.onboarding-overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.onboarding-card {
+  position: relative;
+  width: 100%;
+  max-width: 26rem;
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.92) 0%, rgba(15, 23, 42, 0.96) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 25px 60px -12px rgba(0, 0, 0, 0.8),
+    0 0 60px rgba(52, 211, 153, 0.06),
+    0 0 0 1px rgba(52, 211, 153, 0.05) inset;
+  border-radius: 1.5rem;
+  padding: 2rem 1.75rem;
+  transform: scale(0.96) translateY(16px);
+  animation: onboarding-enter 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes onboarding-enter {
+  0% { opacity: 0; transform: scale(0.94) translateY(20px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.onboarding-overlay.hidden .onboarding-card {
+  transform: scale(0.96) translateY(16px);
+}
+
+@media (max-width: 640px) {
+  .onboarding-overlay {
+    align-items: flex-end;
+    padding: 0.5rem;
+  }
+
+  .onboarding-card {
+    border-radius: 1.5rem 1.5rem 1rem 1rem;
+    padding: 1.5rem 1.25rem;
   }
 }
 

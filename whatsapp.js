@@ -110,11 +110,11 @@ export function initWhatsAppClient(userId = 'default', options = {}) {
       const client = new Client({
         authStrategy: new LocalAuth(authStrategyConfig),
         webVersionCache: {
-          type: 'remote',
-          remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/{version}.html',
+          type: 'none',
         },
         puppeteer: {
           headless: true,
+          ignoreDefaultArgs: ['--enable-automation'],
           ...(process.env.PUPPETEER_EXECUTABLE_PATH ? { executablePath: process.env.PUPPETEER_EXECUTABLE_PATH } : {}),
           args: [
             '--no-sandbox',
@@ -123,7 +123,9 @@ export function initWhatsAppClient(userId = 'default', options = {}) {
             '--disable-blink-features=AutomationControlled',
             '--disable-accelerated-2d-canvas',
             '--no-first-run',
+            '--no-zygote',
             '--disable-gpu',
+            '--disable-software-rasterizer',
             '--disable-extensions',
             '--disable-default-apps',
             '--mute-audio',
@@ -132,6 +134,14 @@ export function initWhatsAppClient(userId = 'default', options = {}) {
             '--disable-breakpad',
             '--disable-sync',
             '--disable-translate',
+            '--disable-features=TranslateUI,BlinkGenPropertyTrees,IsolateOrigins,site-per-process',
+            '--renderer-process-limit=1',
+            '--js-flags=--max-old-space-size=128',
+            '--disk-cache-size=33554432',
+            '--media-cache-size=33554432',
+            '--disable-background-timer-throttling',
+            '--disable-backgrounding-occluded-windows',
+            '--disable-renderer-backgrounding',
             '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
           ],
         },
@@ -139,12 +149,18 @@ export function initWhatsAppClient(userId = 'default', options = {}) {
 
       session.clientInstance = client;
 
+      let loadingWatchdog = null;
+      const clearAllWatchdogs = () => {
+        clearTimeout(initWatchdog);
+        if (loadingWatchdog) clearTimeout(loadingWatchdog);
+      };
+
       // 45-second watchdog timer: alert user if browser takes too long to render WhatsApp Web
       const initWatchdog = setTimeout(() => {
         if (session.authStatus === 'initializing' && !session.latestQrDataUrl && !session.isClientReady) {
           console.warn(`[WhatsApp] [User: ${cleanId}] Initializing is taking >45s. Flagging timeout for retry.`);
           session.authStatus = 'timeout';
-          session.authFailureReason = 'Browser is taking longer than expected. Click "Retry / Force Refresh" to restart.';
+          session.authFailureReason = 'Browser is taking longer than expected. Click "Restart & Generate QR" to retry.';
         }
       }, 45000);
 
@@ -154,6 +170,16 @@ export function initWhatsAppClient(userId = 'default', options = {}) {
         session.authStatus = 'loading';
         session.loadingPercent = percent;
         console.log(`[WhatsApp] [User: ${cleanId}] 🔄 Syncing WhatsApp: ${percent}% - ${message}`);
+
+        if (loadingWatchdog) clearTimeout(loadingWatchdog);
+        // Watchdog: If sync gets stuck >60s due to phone sleep or container RAM throttle
+        loadingWatchdog = setTimeout(() => {
+          if (!session.isClientReady && session.authStatus === 'loading') {
+            console.warn(`[WhatsApp] [User: ${cleanId}] Sync screen stalled >60s.`);
+            session.authStatus = 'timeout';
+            session.authFailureReason = 'Chat sync is taking too long. Your phone may have gone to sleep or memory limit was reached. Please click "Restart & Generate QR".';
+          }
+        }, 60000);
       });
 
       // Event: Display QR Code for terminal and web dashboard scanning
@@ -184,7 +210,7 @@ export function initWhatsAppClient(userId = 'default', options = {}) {
 
       // Event: Authentication successful
       client.on('authenticated', () => {
-        clearTimeout(initWatchdog);
+        clearAllWatchdogs();
         console.log(`[WhatsApp] [User: ${cleanId}] ✅ Session authenticated successfully.`);
         session.authStatus = 'authenticated';
         session.latestQrString = null;
@@ -194,7 +220,7 @@ export function initWhatsAppClient(userId = 'default', options = {}) {
 
       // Event: Authentication failure
       client.on('auth_failure', (msg) => {
-        clearTimeout(initWatchdog);
+        clearAllWatchdogs();
         console.error(`[WhatsApp] [User: ${cleanId}] ❌ Authentication failure:`, msg);
         session.isClientReady = false;
         session.authStatus = 'auth_failure';
@@ -206,7 +232,7 @@ export function initWhatsAppClient(userId = 'default', options = {}) {
 
       // Event: Client is ready to send and receive messages
       client.on('ready', () => {
-        clearTimeout(initWatchdog);
+        clearAllWatchdogs();
         session.isClientReady = true;
         session.authStatus = 'ready';
         session.latestQrString = null;
@@ -217,8 +243,8 @@ export function initWhatsAppClient(userId = 'default', options = {}) {
       });
 
       // Event: Disconnected / Logged out
-      client.on('disconnected', (reason) => {
-        clearTimeout(initWatchdog);
+      client.on('disconnected', async (reason) => {
+        clearAllWatchdogs();
         console.warn(`[WhatsApp] [User: ${cleanId}] ⚠️ WhatsApp client was disconnected. Reason:`, reason);
         session.isClientReady = false;
         session.authStatus = 'disconnected';
@@ -226,19 +252,22 @@ export function initWhatsAppClient(userId = 'default', options = {}) {
         session.latestQrString = null;
         session.latestQrDataUrl = null;
         session.clientInitPromise = null;
+        try {
+          await client.destroy();
+        } catch (_) {}
         session.clientInstance = null;
       });
 
       // Event: Puppeteer browser crash or error
       client.on('error', (err) => {
-        clearTimeout(initWatchdog);
+        clearAllWatchdogs();
         console.error(`[WhatsApp] [User: ${cleanId}] Client error occurred:`, err.message);
         session.authStatus = 'auth_failure';
         session.authFailureReason = err.message;
       });
 
       client.initialize().catch((err) => {
-        clearTimeout(initWatchdog);
+        clearAllWatchdogs();
         console.error(`[WhatsApp] [User: ${cleanId}] Failed during initialize():`, err.message);
         session.isClientReady = false;
         session.authStatus = 'auth_failure';

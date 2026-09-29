@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 
 const DATA_DIR = path.resolve('./data');
 const USERS_DIR = path.join(DATA_DIR, 'users');
@@ -18,6 +19,8 @@ export const DEFAULT_USER_STATE = {
   lastSentAt: null,
   lastStatus: 'idle',
   history: [],
+  sessionToken: null, // Per-user auth token, auto-generated on workspace creation
+  createdAt: null,
 };
 
 /**
@@ -90,13 +93,24 @@ class StateStore {
         const raw = fs.readFileSync(filePath, 'utf-8');
         const parsed = JSON.parse(raw);
         const state = { ...DEFAULT_USER_STATE, ...parsed };
+        if (!state.sessionToken) {
+          state.sessionToken = crypto.randomBytes(32).toString('hex');
+          if (!state.createdAt) state.createdAt = new Date().toISOString();
+          this.userStates.set(cleanId, state);
+          this.saveUserState(cleanId);
+          return state;
+        }
         this.userStates.set(cleanId, state);
         return state;
       }
     } catch (err) {
       console.warn(`[Store] Could not read user state for "${cleanId}":`, err.message);
     }
-    const fallback = { ...DEFAULT_USER_STATE };
+    const fallback = {
+      ...DEFAULT_USER_STATE,
+      sessionToken: crypto.randomBytes(32).toString('hex'),
+      createdAt: new Date().toISOString(),
+    };
     this.userStates.set(cleanId, fallback);
     this.saveUserState(cleanId);
     return fallback;
@@ -189,7 +203,51 @@ class StateStore {
     });
   }
 
-  listWorkspaces() {
+  /**
+   * Validates a session token for a specific user.
+   * @param {string} userId
+   * @param {string} token
+   * @returns {boolean}
+   */
+  validateSessionToken(userId, token) {
+    if (!userId || !token) return false;
+    const cleanId = sanitizeUserId(userId);
+    const state = this.getUserState(cleanId);
+    return state.sessionToken && state.sessionToken === token;
+  }
+
+  /**
+   * Returns the session token for a user (used during workspace creation response).
+   * @param {string} userId
+   * @returns {string|null}
+   */
+  getSessionToken(userId) {
+    const cleanId = sanitizeUserId(userId);
+    const state = this.getUserState(cleanId);
+    return state.sessionToken || null;
+  }
+
+  /**
+   * Ensures a user has a session token (migrates legacy users).
+   * @param {string} userId
+   * @returns {string} The session token
+   */
+  ensureSessionToken(userId) {
+    const cleanId = sanitizeUserId(userId);
+    const state = this.getUserState(cleanId);
+    if (!state.sessionToken) {
+      const token = crypto.randomBytes(32).toString('hex');
+      this.updateUserState(cleanId, { sessionToken: token });
+      return token;
+    }
+    return state.sessionToken;
+  }
+
+  /**
+   * Lists all workspaces on the server (internal use for cron rescheduling).
+   * @returns {Array<{id: string, name: string}>}
+   */
+  listAllWorkspaces() {
     try {
       if (!fs.existsSync(USERS_DIR)) return [{ id: 'default', name: 'Default Workspace' }];
       const files = fs.readdirSync(USERS_DIR);
@@ -212,6 +270,21 @@ class StateStore {
     } catch {
       return [{ id: 'default', name: 'Default Workspace' }];
     }
+  }
+
+  /**
+   * Returns only the requesting user's own workspace info (public API).
+   * Prevents enumeration of other users.
+   * @param {string} userId
+   * @returns {Array<{id: string, name: string}>}
+   */
+  listWorkspaces(userId) {
+    const cleanId = sanitizeUserId(userId || 'default');
+    const state = this.getUserState(cleanId);
+    return [{
+      id: cleanId,
+      name: cleanId === 'default' ? 'Default Workspace' : cleanId.charAt(0).toUpperCase() + cleanId.slice(1),
+    }];
   }
 
   // Backward compatibility delegates
